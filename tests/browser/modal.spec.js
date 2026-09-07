@@ -51,7 +51,7 @@ test('Escape and the close button return null, restore focus and allow reopening
 
 test('closing during OCR never returns a late confirmation or reuses the previous image', async ({ page }) => {
   await page.goto('/');
-  await page.route('**/walletcheck-assets/worker.min.js', async (route) => {
+  await page.route('**/walletcheck-assets/tesseract-worker.js', async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 1500));
     await route.continue();
   });

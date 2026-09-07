@@ -8,6 +8,11 @@ const model = {
   format: 'walletcheck-ocr-model', version: 1, language: 'eng', encoding: 'base64+gzip',
   bytes: data.length, sha256: createHash('sha256').update(data).digest('hex'), data: data.toString('base64'),
 };
+const externalModel = {
+  format: 'walletcheck-ocr-model', version: 2, language: 'eng', encoding: 'external+gzip',
+  file: 'lang/eng-v1.traineddata', bytes: data.length,
+  sha256: createHash('sha256').update(data).digest('hex'),
+};
 const base = new URL('http://localhost/walletcheck-assets/');
 
 afterEach(() => vi.unstubAllGlobals());
@@ -36,6 +41,24 @@ describe('validated OCR model loading', () => {
     expect(await loadModel(base, signal)).toEqual(new Uint8Array(data));
     expect(fetch).toHaveBeenCalledWith(new URL('lang/eng-v1.json', base), {
       signal, headers: { Accept: 'application/json' }, cache: 'no-cache',
+    });
+  });
+
+  it('loads and inflates an external gzip model after validating its manifest', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(externalModel), {
+        headers: { 'Content-Type': 'application/json' },
+      }))
+      .mockResolvedValueOnce(new Response(data, {
+        headers: { 'Content-Type': 'application/octet-stream' },
+      }));
+    vi.stubGlobal('fetch', fetch);
+    expect(await loadModel(base, new AbortController().signal)).toEqual(new TextEncoder().encode('model-test-data'));
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenNthCalledWith(2, new URL(externalModel.file, base), {
+      signal: expect.any(AbortSignal),
+      headers: { Accept: 'application/gzip, application/octet-stream' },
+      cache: 'no-cache',
     });
   });
 

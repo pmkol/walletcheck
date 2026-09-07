@@ -2,6 +2,23 @@
   "name": "walletcheck-js",
   "version": "0.1.0",
   "description": "Browser-only wallet address recognition and cross-checking",
+  "keywords": [
+    "wallet",
+    "address",
+    "ocr",
+    "qr-code",
+    "typescript",
+    "web-component"
+  ],
+  "homepage": "https://pmkol.github.io/walletcheck/",
+  "bugs": {
+    "url": "https://github.com/pmkol/walletcheck-js/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pmkol/walletcheck-js.git"
+  },
+  "license": "GPL-3.0-only",
   "type": "module",
   "files": [
     "dist"
@@ -41,10 +58,12 @@
     "@noble/hashes": "^2.4.0",
     "@scure/base": "^2.4.0",
     "qr-scanner": "^1.4.2",
-    "tesseract.js": "^7.0.0"
+    "tesseract-wasm": "^0.11.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
+    "@tesseract.js-data/chi_sim": "^1.0.0",
+    "@tesseract.js-data/chi_tra": "^1.0.0",
     "@tesseract.js-data/eng": "^1.0.0",
     "qrcode": "^1.5.4",
     "typescript": "^7.0.2",

@@ -45,31 +45,33 @@ export function replaceWrappedAddress(text: string, lines: AddressLine[], addres
 }
 
 export function readReflowedAddress(text: string, lines: AddressLine[]): string | undefined {
-  const address = text.trim();
+  // A re-read may legitimately preserve the two source lines. Whitespace is
+  // layout, not address content, so normalize it before comparing both OCR
+  // readings character-for-character.
+  const address = text.replace(/\s+/g, '').trim();
   const original = lines.map((line) => line.text.trim()).join('');
   return /^0x[0-9a-fA-F]{40}$/.test(address) && address.slice(2) === original.slice(2) ? address : undefined;
 }
 
 export function reflowAddressImage(image: HTMLCanvasElement, lines: AddressLine[]): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
-  const padding = 16;
-  const height = Math.max(...lines.map((line) => line.bbox.y1 - line.bbox.y0));
-  const totalWidth = lines.reduce((width, line) => width + line.bbox.x1 - line.bbox.x0 + 2, 0);
-  const scale = Math.min(6, 4096 / totalWidth, 66 / height);
-  canvas.width = Math.ceil(totalWidth * scale + padding * 2);
-  canvas.height = Math.ceil(height * scale + padding * 2);
+  const sourcePadding = 24;
+  const outputPadding = 24;
+  const left = Math.max(0, Math.min(...lines.map((line) => line.bbox.x0)) - sourcePadding);
+  const top = Math.max(0, Math.min(...lines.map((line) => line.bbox.y0)) - sourcePadding);
+  const right = Math.min(image.width, Math.max(...lines.map((line) => line.bbox.x1)) + sourcePadding);
+  const bottom = Math.min(image.height, Math.max(...lines.map((line) => line.bbox.y1)) + sourcePadding);
+  const width = Math.max(1, right - left);
+  const height = Math.max(1, bottom - top);
+  const scale = Math.min(4, 2600 / Math.max(width, height));
+  canvas.width = Math.ceil(width * scale + outputPadding * 2);
+  canvas.height = Math.ceil(height * scale + outputPadding * 2);
   const drawing = canvas.getContext('2d');
   if (!drawing) throw new Error('浏览器不支持 Canvas');
   drawing.fillStyle = '#ffffff';
   drawing.fillRect(0, 0, canvas.width, canvas.height);
-  let left = padding;
-  for (const { bbox } of lines) {
-    const width = bbox.x1 - bbox.x0;
-    const lineHeight = bbox.y1 - bbox.y0;
-    drawing.drawImage(image, bbox.x0, bbox.y0, width, lineHeight,
-      left, padding + (height - lineHeight) * scale, width * scale, lineHeight * scale);
-    left += (width + 2) * scale;
-  }
+  drawing.drawImage(image, left, top, width, height,
+    outputPadding, outputPadding, width * scale, height * scale);
   const pixels = drawing.getImageData(0, 0, canvas.width, canvas.height);
   for (let offset = 0; offset < pixels.data.length; offset += 4) {
     const value = pixels.data[offset] < 128 ? 0 : 255;

@@ -72,7 +72,7 @@ test('full verification stays local, confirms once, closes and resets for new co
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.locator('#output')).toContainText(address);
   expect(await page.evaluate(() => window.confirmations)).toEqual([{ coin: 'USDT', network: 'ethereum', address }]);
-  expect(requests.some((url) => url.includes('walletcheck-assets/worker-loader.js'))).toBe(true);
+  expect(requests.some((url) => url.includes('walletcheck-assets/tesseract-lib.js'))).toBe(true);
   expect(requests.filter((url) => /^https?:/.test(url) && new URL(url).hostname !== '127.0.0.1')).toEqual([]);
   await page.screenshot({ path: 'test-results/walletcheck.png', fullPage: true });
   await page.locator('select#coin').selectOption('USDC');
@@ -95,9 +95,9 @@ test('real OCR cross-check uses self-hosted resources and matches the QR address
   await page.getByRole('button', { name: '开始核对' }).click();
   await expect(page.locator('wallet-check #address')).toHaveText(address, { timeout: 90_000 });
   await expect(page.locator('wallet-check #metadata [data-passed="true"]')).toHaveCount(3);
-  expect(requests.some((url) => url.includes('walletcheck-assets/worker.min.js'))).toBe(true);
+  expect(requests.some((url) => url.includes('walletcheck-assets/tesseract-worker.js'))).toBe(true);
   expect(requests.some((url) => url.includes('walletcheck-assets/lang/eng-v1.json'))).toBe(true);
-  expect(requests.filter((url) => /\.(gz|traineddata|wasm)(?:\?|$)/.test(url))).toEqual([]);
+  expect(requests.some((url) => url.includes('walletcheck-assets/lang/eng-v1.traineddata'))).toBe(true);
   expect(downloads).toEqual([]);
   expect(requests.filter((url) => /^https?:/.test(url) && new URL(url).hostname !== '127.0.0.1')).toEqual([]);
 });
@@ -208,7 +208,7 @@ test('fixed verification reads metadata and accepts a bounded case-insensitive n
   await expect(page.locator('wallet-check #coin-check')).toHaveAttribute('data-passed', 'true', { timeout: 30_000 });
   await expect(page.locator('wallet-check #network-check')).toHaveAttribute('data-passed', 'true');
   await expect(page.getByRole('button', { name: '确认钱包地址' })).toBeEnabled();
-  expect(requests.some((url) => url.includes('walletcheck-assets/worker-loader.js'))).toBe(true);
+  expect(requests.some((url) => url.includes('walletcheck-assets/tesseract-worker.js'))).toBe(true);
 });
 
 for (const scenario of [
@@ -280,7 +280,7 @@ test('invalid model response is rejected before worker initialization', async ({
   await uploadImage(page);
   await page.getByRole('button', { name: '开始核对' }).click();
   await expect(page.locator('wallet-check #status')).toContainText('文字识别模型响应不是 JSON', { timeout: 15_000 });
-  expect(requests.some((url) => url.includes('walletcheck-assets/worker.min.js'))).toBe(false);
+  expect(requests.some((url) => url.includes('walletcheck-assets/tesseract-worker.js'))).toBe(false);
   await expect(page.getByRole('button', { name: '确认钱包地址' })).toBeHidden();
 });
 
@@ -320,7 +320,7 @@ test('corrupted JSON model is rejected and retry works after the resource is rep
   await uploadImage(page);
   await page.getByRole('button', { name: '开始核对' }).click();
   await expect(page.locator('wallet-check #status')).toContainText('完整性校验失败');
-  expect(requests.some((url) => url.includes('walletcheck-assets/worker.min.js'))).toBe(false);
+  expect(requests.some((url) => url.includes('walletcheck-assets/tesseract-worker.js'))).toBe(false);
   await page.unroute('**/walletcheck-assets/lang/eng-v1.json');
   await expect(page.locator('wallet-check #verify')).toBeHidden();
   await page.getByRole('button', { name: '重新核对' }).click();
@@ -346,12 +346,12 @@ test('cancelling a pending model request never starts an OCR worker', async ({ p
   await page.waitForTimeout(1500);
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.locator('#output')).toHaveText('null');
-  expect(requests.some((url) => url.includes('walletcheck-assets/worker.min.js'))).toBe(false);
+  expect(requests.some((url) => url.includes('walletcheck-assets/tesseract-worker.js'))).toBe(false);
 });
 
 test('cancelling OCR prevents stale success', async ({ page }) => {
   await page.goto('/');
-  await page.route('**/walletcheck-assets/worker.min.js', async (route) => {
+  await page.route('**/walletcheck-assets/tesseract-worker.js', async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 1500));
     await route.continue();
   });
@@ -365,7 +365,7 @@ test('cancelling OCR prevents stale success', async ({ page }) => {
   await page.waitForTimeout(2500);
   await expect(page.locator('#output')).toHaveText('null');
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await page.unroute('**/walletcheck-assets/worker.min.js');
+  await page.unroute('**/walletcheck-assets/tesseract-worker.js');
   await uploadImage(page);
   await expect(page.locator('wallet-check .actions')).toBeVisible();
   await page.getByRole('button', { name: '开始核对' }).click();
