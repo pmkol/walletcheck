@@ -145,6 +145,12 @@ describe('network name matching', () => {
 });
 
 describe('coin symbol checks', () => {
+  it('accepts a repeated OCR-noisy coin token from mixed-script headings', () => {
+    expect(verifyMetadata('BUSDTREZINE\nJJUSDTREZEIMZE\nARBITRUM', {
+      coin: 'USDT', network: 'arbitrum',
+    })).toMatchObject({ coin: { status: 'matched', detected: ['USDT'] }, network: { status: 'matched' } });
+  });
+
   it('ignores symbol case but not symbol suffixes', () => {
     expect(verifyMetadata('Coin: usdt', { coin: 'USDT', network: 'ethereum' }).coin.status).toBe('matched');
     for (const coin of ['USDT0', 'USDTO', 'USDC', 'XUSDT', 'USDT.E']) {
@@ -200,6 +206,28 @@ describe('full verification integration', () => {
 });
 
 describe('OCR address correction', () => {
+  it('repairs punctuation noise and an l-to-zero confusion across wrapped OCR lines', () => {
+    const address = '0x03f6c5433245ece78f5c4d9177ee090340557b4d';
+    const text = [
+      '18:26', 'Hutt >', 'all 46 ER',
+      '0x03f6c5433245ece78f5¢c4d9177 eel', '90340557b4d',
+      'Arbitrum One (USDT0)', '0.01 USDT',
+    ].join('\n');
+    expect(evaluateRecognition({ qrPayloads: [address], text }, { coin: 'USDT', network: 'arbitrum' }))
+      .toMatchObject({ status: 'matched', addressStatus: 'matched', payload: { address } });
+  });
+
+  it('accepts a complete wrapped address with only an O/0 prefix confusion', () => {
+    const address = '0xa359b7e6b5b23dd23cb11f644d23676de02987ff';
+    const text = [
+      'BUSDTREZINE', 'ARBITRUM', 'Oxa359b7e6b5b23dd23cb11f644d2367', '6de02987ff',
+      'TEMZE App.', 'JJUSDTREZEIMZE', 'ARBITRUM',
+      'Oxa359b7e6b5b23dd23cb11f644d2367', '6de02987ff',
+    ].join('\n');
+    expect(evaluateRecognition({ qrPayloads: [address], text }, { coin: 'USDT', network: 'arbitrum' }))
+      .toMatchObject({ status: 'matched', addressStatus: 'matched', payload: { address } });
+  });
+
   it('corrects a unique C-like OCR symbol using the QR address', () => {
     const result = evaluateRecognition({
       qrPayloads: ['0x1234567890123456789012345678901234567890'],

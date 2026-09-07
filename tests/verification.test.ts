@@ -42,6 +42,9 @@ describe('cross-check rules', () => {
     expect(evaluateRecognition(recognition, options)).toMatchObject({
       status: 'rejected', reason, addressVerified: false, ocrText: recognition.text,
     });
+    if (reason === 'address-conflict') {
+      expect(evaluateRecognition(recognition, options)).toMatchObject({ addressStatus: 'mismatched' });
+    }
   });
 
   it('deduplicates repeated valid addresses', () => {

@@ -61,4 +61,9 @@ describe('network address formats', () => {
     expect(validateAddress(address, 'ethereum')).toBe(false);
     expect(extractTextCandidates(`prefix0x${'a'.repeat(40)}`, 'ethereum')).toEqual([]);
   });
+
+  it('joins a strictly shaped wrapped EVM address and normalizes an OCR O prefix', () => {
+    expect(extractTextCandidates('Oxa359b7e6b5b23dd23cb11f644d2367\n\n6de02987ff', 'arbitrum'))
+      .toContain('0xa359b7e6b5b23dd23cb11f644d23676de02987ff');
+  });
 });

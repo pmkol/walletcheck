@@ -326,7 +326,9 @@ export class WalletCheckElement extends HTMLElement {
       this.get(`#result-${field}`).textContent = detected;
     }
     const passed = result.status === 'matched' || result.addressVerified;
-    this.showCheck('address', passed, passed ? '核对通过' : '未通过核对');
+    const addressLabel = passed ? '核对通过'
+      : result.addressStatus === 'mismatched' ? '地址不一致' : '无法确认地址';
+    this.showCheck('address', passed, addressLabel);
     this.get('#address').textContent = result.status === 'matched' ? result.payload.address
       : [...new Set([...result.qrAddresses, ...result.textAddresses])].join(' / ');
   }

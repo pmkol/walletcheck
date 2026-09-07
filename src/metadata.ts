@@ -85,6 +85,31 @@ function stripNetworkAnnotations(value: string): string {
   return value.replace(/[（(]\s*usdt0\s*[）)]/ig, '');
 }
 
+function noisyCoinMentions(lines: string[], symbols: string[]): string[] {
+  const occurrences = new Map<string, Set<string>>();
+  const ordered = [...symbols].sort((first, second) => second.length - first.length);
+  for (const line of lines) {
+    if (warningText.test(line) || networkLabel.test(line) || identifyNetworks(line, false).length) continue;
+    if (/^[0o]x[0-9a-f]/i.test(line.replace(/\s+/g, ''))) continue;
+    const value = fold(line);
+    for (const symbol of ordered) {
+      const needle = symbol.toLowerCase();
+      const index = value.indexOf(needle);
+      if (index < 0) continue;
+      // A longer known symbol owns its substring (USDT0 must not become USDT).
+      if (ordered.some((other) => other.length > symbol.length && value.includes(other.toLowerCase()))) continue;
+      const before = value[index - 1] ?? '';
+      const after = value[index + needle.length] ?? '';
+      if (!/[a-z0-9]/i.test(before) && !/[a-z0-9]/i.test(after)) continue;
+      const values = occurrences.get(symbol) ?? new Set<string>();
+      values.add(value);
+      occurrences.set(symbol, values);
+    }
+  }
+  // Require repeated evidence before accepting a noisy OCR substring.
+  return [...occurrences.entries()].filter(([, values]) => values.size >= 2).map(([symbol]) => symbol);
+}
+
 function check(expected: string, detected: string[]): MetadataCheck {
   const distinct = [...new Set(detected)];
   return {
@@ -123,6 +148,7 @@ export function verifyMetadata(text: string, options: CheckerOptions): MetadataV
       .test(stripNetworkAnnotations(stripNetworkNames(value))));
     return found.length ? found : [value.toUpperCase()];
   }));
+  detectedCoins.push(...noisyCoinMentions(coinLines, symbols));
   return { coin: check(expectedCoin, detectedCoins), network: check(options.network, detectedNetworks) };
 }
 

@@ -61,8 +61,12 @@ export function evaluateRecognition(
     const corrected = correctOcrAddress(recognition.text, qrAddresses[0], options.network);
     if (corrected) textAddresses.push(normalizeAddress(corrected, options.network));
   }
-  const reject = (reason: FailureReason, addressVerified = false): VerificationResult => ({
-    status: 'rejected', reason, addressVerified, qrAddresses, textAddresses, ocrText: recognition.text, metadata,
+  const reject = (
+    reason: FailureReason,
+    addressStatus: 'matched' | 'mismatched' | 'uncertain' = 'uncertain',
+  ): VerificationResult => ({
+    status: 'rejected', reason, addressStatus, addressVerified: addressStatus === 'matched',
+    qrAddresses, textAddresses, ocrText: recognition.text, metadata,
   });
   const invalidQr = parsed.find((entry) => 'error' in entry);
   if (invalidQr && 'error' in invalidQr) return reject(invalidQr.error);
@@ -76,14 +80,15 @@ export function evaluateRecognition(
   if (qrAddresses.length > 1 || textAddresses.length > 1) return reject('multiple-addresses');
   if (!qrAddresses.length && !textAddresses.length) return reject('no-address');
   if (qrAddresses.length && textAddresses.length && qrAddresses[0] !== textAddresses[0]) {
-    return reject('address-conflict');
+    return reject('address-conflict', 'mismatched');
   }
   if (!qrAddresses.length) return reject('missing-qr');
   if (!textAddresses.length) return reject('missing-text');
   const failure = metadataFailure(metadata);
-  if (failure) return reject(failure, true);
+  if (failure) return reject(failure, 'matched');
   return {
     status: 'matched',
+    addressStatus: 'matched',
     metadata,
     payload: {
       coin: options.coin,

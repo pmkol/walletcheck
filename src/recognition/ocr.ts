@@ -59,6 +59,44 @@ function progressValue(progress: number): number {
   return progress > 1 ? progress / 100 : progress;
 }
 
+interface OcrProgress {
+  report(progress: number): void;
+  complete(): void;
+  skip(count: number): void;
+}
+
+/** Aggregate the independent Tesseract passes into one monotonic progress bar. */
+export function createOcrProgress(onProgress: (progress: number) => void): OcrProgress {
+  const totalPasses = 9; // full + 2 regions + up to 4 address retries + 2 Chinese models
+  let completedPasses = 0;
+  let currentProgress = 0;
+  let lastProgress = 0;
+  const emit = () => {
+    const progress = Math.min(1, Math.max(lastProgress, (completedPasses + currentProgress) / totalPasses));
+    if (progress === lastProgress) return;
+    lastProgress = progress;
+    onProgress(progress);
+  };
+  return {
+    report(value) {
+      currentProgress = Math.max(currentProgress, Math.min(1, Math.max(0, progressValue(value))));
+      emit();
+    },
+    complete() {
+      currentProgress = 1;
+      emit();
+      completedPasses = Math.min(totalPasses, completedPasses + 1);
+      currentProgress = 0;
+      emit();
+    },
+    skip(count) {
+      completedPasses = Math.min(totalPasses, completedPasses + Math.max(0, count));
+      currentProgress = 0;
+      emit();
+    },
+  };
+}
+
 function hasWrappedLines(text: string, lines: AddressLine[]): boolean {
   const expected = lines.map((line) => line.text.trim());
   const actual = text.split(/\r?\n/).map((line) => line.trim());
@@ -107,27 +145,25 @@ export class OcrEngine {
   private async recognizeLines(
     client: OCRClient,
     canvas: HTMLCanvasElement,
-    context: RecognitionContext,
+    progress: OcrProgress,
   ): Promise<{ text: string; lines: AddressLine[] }> {
     await client.loadImage(imageData(canvas));
     try {
-      const items = await client.getTextBoxes('line', (progress) => {
-        if (!this.context?.signal.aborted) context.onProgress('ocr', progressValue(progress));
+      const items = await client.getTextBoxes('line', (value) => {
+        progress.report(value);
       });
       return { text: items.map((item) => item.text).join('\n'), lines: items.map(lineFromTextItem) };
     } finally {
-      await client.clearImage();
+      try { await client.clearImage(); } finally { progress.complete(); }
     }
   }
 
-  private async recognizeText(client: OCRClient, canvas: HTMLCanvasElement, context: RecognitionContext): Promise<string> {
+  private async recognizeText(client: OCRClient, canvas: HTMLCanvasElement, progress: OcrProgress): Promise<string> {
     await client.loadImage(imageData(canvas));
     try {
-      return await client.getText((progress) => {
-        if (!this.context?.signal.aborted) context.onProgress('ocr', progressValue(progress));
-      });
+      return await client.getText((value) => { progress.report(value); });
     } finally {
-      await client.clearImage();
+      try { await client.clearImage(); } finally { progress.complete(); }
     }
   }
 
@@ -154,14 +190,17 @@ export class OcrEngine {
       const base = new URL(context.assetBaseUrl.replace(/\/$/, '') + '/', document.baseURI);
       const english = await this.getClient('eng', base, context.signal, context, loading.signal);
       context.signal.throwIfAborted();
-      const full = await this.recognizeLines(english, image, context);
+      const ocrProgress = createOcrProgress((progress) => {
+        if (!this.context?.signal.aborted) context.onProgress('ocr', progress);
+      });
+      const full = await this.recognizeLines(english, image, ocrProgress);
       let text = full.text;
       const regions = [cropRegion(image, 0, 0.3), cropRegion(image, 0.45, 1)];
       const regionalTexts: string[] = [];
       try {
         for (const region of regions) {
           context.signal.throwIfAborted();
-          regionalTexts.push(await this.recognizeText(english, region, context));
+          regionalTexts.push(await this.recognizeText(english, region, ocrProgress));
         }
       } finally {
         for (const region of regions) { region.width = 0; region.height = 0; }
@@ -169,11 +208,12 @@ export class OcrEngine {
       // Replace wrapped addresses before appending regional OCR output. The
       // regional passes can repeat the same lines, while replacement requires
       // an unambiguous occurrence in the original line result.
-      for (const group of findWrappedAddresses(full.lines).slice(0, 4)) {
+      const addressGroups = findWrappedAddresses(full.lines).slice(0, 4);
+      for (const group of addressGroups) {
         context.signal.throwIfAborted();
         const canvas = reflowAddressImage(image, group);
         try {
-          const retryText = await this.recognizeText(english, canvas, context);
+          const retryText = await this.recognizeText(english, canvas, ocrProgress);
           let address = readReflowedAddress(retryText, group);
           // If the tightly cropped re-read is segmented into two lines, a
           // second independent regional pass can still confirm the exact
@@ -187,6 +227,7 @@ export class OcrEngine {
           canvas.height = 0;
         }
       }
+      ocrProgress.skip(4 - addressGroups.length);
       for (const regionalText of regionalTexts) text += `\n${regionalText}`;
       // tesseract-wasm loads one language model per worker. Chinese workers are
       // used as supplemental evidence while the English result remains the
@@ -194,7 +235,7 @@ export class OcrEngine {
       for (const language of LANGUAGES.slice(1)) {
         context.signal.throwIfAborted();
         const client = await this.getClient(language, base, context.signal, context, loading.signal);
-        const evidence = onlyChineseEvidence(await this.recognizeText(client, image, context));
+        const evidence = onlyChineseEvidence(await this.recognizeText(client, image, ocrProgress));
         if (evidence) text += `\n${evidence}`;
       }
       return text;

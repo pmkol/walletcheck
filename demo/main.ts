@@ -79,6 +79,7 @@ form.addEventListener('submit', async (event) => {
       debugOutput.hidden = false;
       debugOutput.textContent = JSON.stringify({
         reason: result.status === 'rejected' ? result.reason : null,
+        addressStatus: result.addressStatus,
         addressVerified: result.status === 'rejected' ? result.addressVerified : true,
         qrAddresses: result.status === 'rejected' ? result.qrAddresses : [result.payload.address],
         textAddresses: result.status === 'rejected' ? result.textAddresses : [result.payload.address],

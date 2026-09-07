@@ -77,6 +77,8 @@ export const translate = createTranslator({
   '不一致': ['Mismatch', '不一致'],
   '有歧义': ['Ambiguous', '有歧義'],
   '未通过核对': ['Not verified', '未通過核對'],
+  '地址不一致': ['Address mismatch', '地址不一致'],
+  '无法确认地址': ['Address cannot be confirmed', '無法確認地址'],
   '正在处理图片': ['Preparing image', '正在處理圖片'],
   '正在识别二维码': ['Reading QR codes', '正在辨識 QR 碼'],
   '正在加载本地文字识别引擎': ['Loading on-device OCR engine', '正在載入本機文字辨識引擎'],

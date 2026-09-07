@@ -50,6 +50,8 @@ export interface CheckerOptions {
   recognizer?: Recognizer;
 }
 
+export type AddressStatus = 'matched' | 'mismatched' | 'uncertain';
+
 export type FailureReason =
   | 'no-address'
   | 'invalid-address'
@@ -66,5 +68,5 @@ export type FailureReason =
   | 'address-conflict';
 
 export type VerificationResult =
-  | { status: 'matched'; payload: WalletPayload; sources: ('qr' | 'text')[]; metadata: MetadataVerification }
-  | { status: 'rejected'; reason: FailureReason; addressVerified: boolean; qrAddresses: string[]; textAddresses: string[]; ocrText: string; metadata: MetadataVerification };
+  | { status: 'matched'; addressStatus: 'matched'; payload: WalletPayload; sources: ('qr' | 'text')[]; metadata: MetadataVerification }
+  | { status: 'rejected'; reason: FailureReason; addressStatus: AddressStatus; addressVerified: boolean; qrAddresses: string[]; textAddresses: string[]; ocrText: string; metadata: MetadataVerification };
