@@ -8,7 +8,7 @@ export type WalletCheckModalOptions = Pick<CheckerOptions, 'coin' | 'network' | 
 
 let active = false;
 
-export async function openWalletCheck(options: WalletCheckModalOptions): Promise<WalletPayload | null> {
+export async function openWalletCheck(options: WalletCheckModalOptions, onResult?: (result: unknown) => void): Promise<WalletPayload | null> {
   const locale = resolveLocale(options.locale);
   if (active) throw new Error(translate('已有钱包核对弹窗打开，请先完成或关闭。', locale));
   try {
@@ -67,6 +67,7 @@ export async function openWalletCheck(options: WalletCheckModalOptions): Promise
     checker.addEventListener('wallet-confirm', (event) => {
       finish({ ...(event as CustomEvent<WalletPayload>).detail });
     });
+    checker.addEventListener('wallet-result', (event) => onResult?.((event as CustomEvent).detail));
     root.querySelector('button')!.addEventListener('click', () => finish(null));
     dialog.addEventListener('cancel', (event) => { event.preventDefault(); finish(null); });
     dialog.addEventListener('close', () => finish(null));

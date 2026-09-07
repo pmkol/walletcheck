@@ -32,6 +32,8 @@ const code = document.querySelector<HTMLElement>('#integration-code')!;
 const output = document.querySelector<HTMLElement>('#output')!;
 const status = document.querySelector<HTMLElement>('#demo-status')!;
 const copyStatus = document.querySelector<HTMLElement>('#copy-status')!;
+const debugMode = document.querySelector<HTMLInputElement>('#debug-mode')!;
+const debugOutput = document.querySelector<HTMLElement>('#debug-output')!;
 
 for (const [value, config] of Object.entries(networks)) {
   networkSelect.add(new Option(config.label, value));
@@ -52,6 +54,8 @@ function updateCode() {
   copyStatus.textContent = '';
   status.textContent = t('参数准备好后，点击演示按钮体验完整流程。');
   output.textContent = t('尚无确认结果');
+  debugOutput.hidden = true;
+  debugOutput.textContent = '';
 }
 
 form.addEventListener('input', updateCode);
@@ -65,8 +69,22 @@ form.addEventListener('submit', async (event) => {
   status.textContent = t('正在打开核对弹窗…');
   try {
     const { openWalletCheck } = await import('../src/modal');
-    const result = await openWalletCheck(options);
+    const result = await openWalletCheck(options, (debugResult) => {
+      if (!debugMode.checked) return;
+      debugOutput.hidden = false;
+      debugOutput.textContent = JSON.stringify(debugResult, null, 2);
+    });
     output.textContent = result ? JSON.stringify(result, null, 2) : 'null';
+    if (debugMode.checked && result) {
+      debugOutput.hidden = false;
+      debugOutput.textContent = JSON.stringify({
+        reason: result.status === 'rejected' ? result.reason : null,
+        addressVerified: result.status === 'rejected' ? result.addressVerified : true,
+        qrAddresses: result.status === 'rejected' ? result.qrAddresses : [result.payload.address],
+        textAddresses: result.status === 'rejected' ? result.textAddresses : [result.payload.address],
+        metadata: result.metadata,
+      }, null, 2);
+    }
     status.textContent = t(result ? '已确认：弹窗已关闭，三项参数已返回宿主。' : '用户已取消，没有提交钱包地址。');
   } catch (error) {
     output.textContent = t('未返回结果');
