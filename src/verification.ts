@@ -62,7 +62,7 @@ export function evaluateRecognition(
     if (corrected) textAddresses.push(normalizeAddress(corrected, options.network));
   }
   const reject = (reason: FailureReason, addressVerified = false): VerificationResult => ({
-    status: 'rejected', reason, addressVerified, qrAddresses, textAddresses, metadata,
+    status: 'rejected', reason, addressVerified, qrAddresses, textAddresses, ocrText: recognition.text, metadata,
   });
   const invalidQr = parsed.find((entry) => 'error' in entry);
   if (invalidQr && 'error' in invalidQr) return reject(invalidQr.error);

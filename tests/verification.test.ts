@@ -39,7 +39,9 @@ describe('cross-check rules', () => {
     [{ qrPayloads: [address], text: `0x${'a'.repeat(39)}O` }, 'invalid-address'],
     [{ qrPayloads: [address], text: '0xaaaa...aaaa' }, 'invalid-address'],
   ])('rejects unsafe or incomplete recognition %#', (recognition, reason) => {
-    expect(evaluateRecognition(recognition, options)).toMatchObject({ status: 'rejected', reason, addressVerified: false });
+    expect(evaluateRecognition(recognition, options)).toMatchObject({
+      status: 'rejected', reason, addressVerified: false, ocrText: recognition.text,
+    });
   });
 
   it('deduplicates repeated valid addresses', () => {

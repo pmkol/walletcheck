@@ -82,6 +82,7 @@ form.addEventListener('submit', async (event) => {
         addressVerified: result.status === 'rejected' ? result.addressVerified : true,
         qrAddresses: result.status === 'rejected' ? result.qrAddresses : [result.payload.address],
         textAddresses: result.status === 'rejected' ? result.textAddresses : [result.payload.address],
+        ocrText: result.status === 'rejected' ? result.ocrText : undefined,
         metadata: result.metadata,
       }, null, 2);
     }

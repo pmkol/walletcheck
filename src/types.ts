@@ -67,4 +67,4 @@ export type FailureReason =
 
 export type VerificationResult =
   | { status: 'matched'; payload: WalletPayload; sources: ('qr' | 'text')[]; metadata: MetadataVerification }
-  | { status: 'rejected'; reason: FailureReason; addressVerified: boolean; qrAddresses: string[]; textAddresses: string[]; metadata: MetadataVerification };
+  | { status: 'rejected'; reason: FailureReason; addressVerified: boolean; qrAddresses: string[]; textAddresses: string[]; ocrText: string; metadata: MetadataVerification };
