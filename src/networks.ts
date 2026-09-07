@@ -76,3 +76,30 @@ export function extractTextCandidates(text: string, network: Network): string[] 
     : /(?<![a-zA-Z0-9])[a-zA-Z0-9]{26,110}(?![a-zA-Z0-9])/g;
   return [...new Set(text.match(pattern) ?? [])];
 }
+
+const ocrConfusions: Record<string, string[]> = {
+  '0': ['o', 'O', 'd', 'D'], '1': ['i', 'I', 'l', '|'], '2': ['z', 'Z'],
+  '5': ['s', 'S'], '6': ['g', 'G'], '8': ['b', 'B'],
+  'C': ['(', '¢', '©'], 'x': ['X', '×', '*'],
+};
+
+export function correctOcrAddress(text: string, expected: string, network: Network): string | undefined {
+  if (!validateAddress(expected, network)) return undefined;
+  const candidates = text.match(/0[xX][^\s\n]{30,60}/g) ?? [];
+  for (const candidate of candidates) {
+    const compact = candidate.replace(/[\s|·•,，;；_]/g, '');
+    if (compact.length !== expected.length) continue;
+    let corrections = 0;
+    let valid = true;
+    for (let index = 0; index < expected.length; index += 1) {
+      const actual = compact[index];
+      const target = expected[index];
+      if (actual === target || actual.toLowerCase() === target.toLowerCase()) continue;
+      const targetClass = ocrConfusions[target] ?? ocrConfusions[target.toUpperCase()];
+      if (!targetClass?.includes(actual) || corrections >= 2) { valid = false; break; }
+      corrections += 1;
+    }
+    if (valid && corrections > 0) return expected;
+  }
+  return undefined;
+}

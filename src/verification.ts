@@ -1,4 +1,4 @@
-import { extractTextCandidates, networks, normalizeAddress, validateAddress } from './networks';
+import { correctOcrAddress, extractTextCandidates, networks, normalizeAddress, validateAddress } from './networks';
 import type { CheckerOptions, FailureReason, Recognition, VerificationResult } from './types';
 import { metadataFailure, verifyMetadata } from './metadata';
 
@@ -57,6 +57,10 @@ export function evaluateRecognition(
   ))];
   const qrAddresses = distinct(parsed.flatMap((entry) => 'address' in entry ? [entry.address] : []));
   const textAddresses = distinct(textCandidates.filter((address) => validateAddress(address, options.network)));
+  if (qrAddresses.length === 1 && !textAddresses.length) {
+    const corrected = correctOcrAddress(recognition.text, qrAddresses[0], options.network);
+    if (corrected) textAddresses.push(normalizeAddress(corrected, options.network));
+  }
   const reject = (reason: FailureReason, addressVerified = false): VerificationResult => ({
     status: 'rejected', reason, addressVerified, qrAddresses, textAddresses, metadata,
   });

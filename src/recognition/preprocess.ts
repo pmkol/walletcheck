@@ -26,18 +26,19 @@ export function prepareOcrImage(image: HTMLCanvasElement): HTMLCanvasElement {
   const darkBackground = hasDarkBackground(sampling.getImageData(0, 0, 32, 32).data, 32, 32);
   sample.width = 0;
   sample.height = 0;
-  if (!darkBackground) return image;
+  if (!darkBackground && Math.max(image.width, image.height) >= 1600) return image;
   const canvas = document.createElement('canvas');
-  canvas.width = image.width;
-  canvas.height = image.height;
+  const scale = Math.min(3.2, 2400 / Math.max(image.width, image.height));
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
   const drawing = canvas.getContext('2d', { willReadFrequently: true });
   if (!drawing) throw new Error('浏览器不支持 Canvas');
   if (typeof drawing.filter === 'string') {
     drawing.filter = 'grayscale(1) invert(1)';
-    drawing.drawImage(image, 0, 0);
+    drawing.drawImage(image, 0, 0, canvas.width, canvas.height);
     return canvas;
   }
-  drawing.drawImage(image, 0, 0);
+  drawing.drawImage(image, 0, 0, canvas.width, canvas.height);
   const pixels = drawing.getImageData(0, 0, canvas.width, canvas.height);
   for (let offset = 0; offset < pixels.data.length; offset += 4) {
     const luminance = Math.round(pixels.data[offset] * 0.2126

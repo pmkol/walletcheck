@@ -53,6 +53,12 @@ describe('network name matching', () => {
     });
   });
 
+  it('ignores a token annotation inside a network heading', () => {
+    expect(verifyMetadata('USDT\nArbitrum One (USDT0)', { coin: 'USDT', network: 'arbitrum' })).toMatchObject({
+      coin: { status: 'matched', detected: ['USDT'] }, network: { status: 'matched' },
+    });
+  });
+
   it.each([
     'USDC USDT Arbitrum', 'Coin: USDC\nUSDT\nNetwork: Arbitrum',
     'USDC Arbitrum\nUSDC.E', 'USDC Arbitrum\nUSDT0',
@@ -149,8 +155,8 @@ describe('coin symbol checks', () => {
   it('distinguishes coin fields from network abbreviations and network annotations', () => {
     expect(verifyMetadata('Receive USDT\nNetwork:\nETH', { coin: 'USDT', network: 'ethereum' }).coin.status).toBe('matched');
     const metadata = verifyMetadata('Receive USDT\nArbitrum One (USDT0)', { coin: 'USDT', network: 'arbitrum' });
-    expect(metadata.coin.detected).toEqual(['USDT', 'USDT0']);
-    expect(metadata.coin.status).toBe('ambiguous');
+    expect(metadata.coin.detected).toEqual(['USDT']);
+    expect(metadata.coin.status).toBe('matched');
     expect(metadata.network.status).toBe('matched');
     expect(verifyMetadata('Coin: USDT0\nNetwork: Arbitrum One', { coin: 'USDT', network: 'arbitrum' }).coin.status).toBe('mismatch');
   });
@@ -190,5 +196,15 @@ describe('full verification integration', () => {
     const legacyOptions = { ...options, mode: 'single-source', metadataPolicy: 'address-only' };
     expect(evaluateRecognition({ qrPayloads: [address], text: address }, legacyOptions))
       .toMatchObject({ status: 'rejected', reason: 'missing-network', metadata: { coin: { status: 'missing' }, network: { status: 'missing' } } });
+  });
+});
+
+describe('OCR address correction', () => {
+  it('corrects a unique C-like OCR symbol using the QR address', () => {
+    const result = evaluateRecognition({
+      qrPayloads: ['0x1234567890123456789012345678901234567890'],
+      text: 'USDT\nArbitrum One\n0x1234567890123456789012345678901234567890',
+    }, { coin: 'USDT', network: 'arbitrum', assetBaseUrl: '' });
+    expect(result.status).toBe('matched');
   });
 });

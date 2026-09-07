@@ -81,6 +81,10 @@ function stripNetworkNames(value: string): string {
   return value;
 }
 
+function stripNetworkAnnotations(value: string): string {
+  return value.replace(/[（(]\s*usdt0\s*[）)]/ig, '');
+}
+
 function check(expected: string, detected: string[]): MetadataCheck {
   const distinct = [...new Set(detected)];
   return {
@@ -103,18 +107,20 @@ export function verifyMetadata(text: string, options: CheckerOptions): MetadataV
   const coinFields = labelledValues(lines, coinLabel);
   const coinLines = lines.filter((line) => !coinLabel.test(line) && !coinFields.includes(line)
     && !warningText.test(line)).map((line) => {
-      const value = stripNetworkNames(networkLabel.exec(line)?.[1] ?? line);
+      const value = stripNetworkAnnotations(stripNetworkNames(networkLabel.exec(line)?.[1] ?? line));
       return networkLabel.test(line) || networkFields.includes(line)
         ? value.replace(/^(?:eth|btc|sol|trx|op|matic)$/i, '') : value;
     });
   const symbols = [...new Set([...knownCoins, expectedCoin])];
   const detectedCoins = coinLines.flatMap((line) => {
-    const found = symbols.filter((symbol) => new RegExp(`(?<![A-Z0-9._-])${escape(symbol)}(?![A-Z0-9._-])`, 'i').test(line));
+    const found = symbols.filter((symbol) => new RegExp(`(?<![A-Z0-9._-])${escape(symbol)}(?![A-Z0-9._-])`, 'i')
+      .test(stripNetworkAnnotations(line)));
     return found;
   });
   detectedCoins.push(...coinFields.filter(Boolean).flatMap((value) => {
     if (warningText.test(value)) return [value.toUpperCase()];
-    const found = symbols.filter((symbol) => new RegExp(`(?<![A-Z0-9._-])${escape(symbol)}(?![A-Z0-9._-])`, 'i').test(stripNetworkNames(value)));
+    const found = symbols.filter((symbol) => new RegExp(`(?<![A-Z0-9._-])${escape(symbol)}(?![A-Z0-9._-])`, 'i')
+      .test(stripNetworkAnnotations(stripNetworkNames(value))));
     return found.length ? found : [value.toUpperCase()];
   }));
   return { coin: check(expectedCoin, detectedCoins), network: check(options.network, detectedNetworks) };
