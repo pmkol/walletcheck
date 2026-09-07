@@ -1,0 +1,28 @@
+import { createTranslator } from '../src/i18n';
+
+export const translateDemo = createTranslator({
+  'WalletCheck · 弹窗集成演示': ['WalletCheck · Integration demo', 'WalletCheck · 彈窗整合示範'],
+  '弹窗集成演示': ['MODAL INTEGRATION DEMO', '彈窗整合示範'],
+  '配好参数，一键体验核对。': ['Configure. Open. Verify.', '設定參數，一鍵體驗核對。'],
+  '这里模拟你的宿主项目：选择币种和网络，再打开弹窗完成图片识别。二维码、文字地址、币种和网络全部核对通过后才能确认。': ['Try the host application flow: select a coin and network, then open the dialog to verify a screenshot. The QR code, text address, coin, and network must all pass before confirmation.', '這裡模擬你的宿主專案：選擇幣種和網路，再開啟彈窗完成圖片辨識。QR 碼、文字地址、幣種和網路全部核對通過後才能確認。'],
+  '配置验证参数': ['Verification options', '設定驗證參數'],
+  '币种': ['Coin', '幣種'],
+  '网络': ['Network', '網路'],
+  '固定核对：二维码与文字地址一致，并核对截图中的币种和网络。支持明确网络别名及大小写差异，任何一项缺失或不符都不能确认。': ['Checks the QR code against the text address, plus the screenshot’s coin and network. Supported aliases are case-insensitive. Missing or conflicting information prevents confirmation.', '固定核對：QR 碼與文字地址一致，並核對截圖中的幣種和網路。支援明確網路別名及大小寫差異，任何一項缺失或不符都不能確認。'],
+  '打开验证演示 ↗': ['Open verification demo ↗', '開啟驗證示範 ↗'],
+  '图片不会上传。点击开始核对后才加载 OCR 引擎与模型。': ['Images are never uploaded. The OCR engine and model load only when verification starts.', '圖片不會上傳。點擊開始核對後才載入 OCR 引擎與模型。'],
+  '对应接入代码': ['Integration code', '對應整合程式碼'],
+  '复制代码': ['Copy code', '複製程式碼'],
+  '代码随配置实时更新。确认返回三项参数，关闭或按 Esc 取消则返回 null。接入前请部署 OCR 静态资源。': ['The code updates with your options. Confirmation returns three parameters; closing or pressing Esc returns null. Deploy the OCR assets before integration.', '程式碼隨設定即時更新。確認回傳三項參數，關閉或按 Esc 取消則回傳 null。整合前請部署 OCR 靜態資源。'],
+  '程序收到的结果': ['Application result', '程式收到的結果'],
+  '尚无确认结果': ['No confirmed result yet', '尚無確認結果'],
+  '仅核对地址格式及图片内容，不证明钱包归属、链上状态或币种接收能力。': ['Verifies address format and image content only—not wallet ownership, on-chain status, or asset compatibility.', '僅核對地址格式及圖片內容，不證明錢包歸屬、鏈上狀態或幣種接收能力。'],
+  '参数准备好后，点击演示按钮体验完整流程。': ['Choose your options, then open the demo to try the full flow.', '參數準備好後，點擊示範按鈕體驗完整流程。'],
+  '等待弹窗内确认…': ['Waiting for confirmation in the dialog…', '等待彈窗內確認…'],
+  '正在打开核对弹窗…': ['Opening verification dialog…', '正在開啟核對彈窗…'],
+  '已确认：弹窗已关闭，三项参数已返回宿主。': ['Confirmed: the dialog is closed and the three parameters have been returned.', '已確認：彈窗已關閉，三項參數已回傳宿主。'],
+  '用户已取消，没有提交钱包地址。': ['Cancelled. No wallet address was submitted.', '使用者已取消，沒有提交錢包地址。'],
+  '未返回结果': ['No result returned', '未回傳結果'],
+  '代码已复制': ['Code copied', '程式碼已複製'],
+  '浏览器不允许自动复制，请选中代码后手动复制。': ['Automatic copying is unavailable. Select and copy the code manually.', '瀏覽器不允許自動複製，請選取程式碼後手動複製。'],
+});

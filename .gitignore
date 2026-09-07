@@ -1,0 +1,12 @@
+node_modules/
+.agents/
+.codex/
+*.tgz
+*.log
+dist/
+dist-demo/
+walletcheck-demo.tar.gz
+public/walletcheck-assets/
+coverage/
+test-results/
+playwright-report/

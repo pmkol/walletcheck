@@ -1,0 +1,54 @@
+{
+  "name": "walletcheck-js",
+  "version": "0.1.0",
+  "description": "Browser-only wallet address recognition and cross-checking",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": [
+    "./src/element.ts",
+    "./src/modal.ts",
+    "./dist/element.js",
+    "./dist/modal.js"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./element": {
+      "types": "./dist/element.d.ts",
+      "import": "./dist/element.js"
+    },
+    "./modal": {
+      "types": "./dist/modal.d.ts",
+      "import": "./dist/modal.js"
+    }
+  },
+  "scripts": {
+    "predev": "npm run assets:ocr",
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc --noEmit && vite build && tsc --emitDeclarationOnly",
+    "build:demo": "tsc --noEmit && vite build --config vite.demo.config.ts && npm run assets:ocr -- dist-demo/walletcheck-assets",
+    "preview:demo": "vite preview --config vite.demo.config.ts",
+    "test": "vitest run",
+    "test:browser": "playwright test",
+    "typecheck": "tsc --noEmit",
+    "assets:ocr": "node scripts/copy-ocr-assets.mjs"
+  },
+  "dependencies": {
+    "@noble/hashes": "^2.4.0",
+    "@scure/base": "^2.4.0",
+    "qr-scanner": "^1.4.2",
+    "tesseract.js": "^7.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@tesseract.js-data/eng": "^1.0.0",
+    "qrcode": "^1.5.4",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
+    "vitest": "^5.0.0"
+  }
+}
