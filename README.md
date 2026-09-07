@@ -6,6 +6,8 @@ A browser-only TypeScript SDK for checking wallet addresses in screenshots. No V
 
 Provide a coin and network. WalletCheck reads QR codes and text, validates the address format, compares the two address sources, and checks the displayed coin and network. No expected address is required. Images stay in the browser; OCR loads on demand.
 
+[Live demo](https://pmkol.github.io/walletcheck/)
+
 ## Installation
 
 Build the package in this repository with Node.js 24:
