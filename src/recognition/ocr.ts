@@ -4,6 +4,20 @@ import type { RecognitionContext } from '../types';
 import { loadModel } from './model';
 import { findWrappedAddresses, readReflowedAddress, reflowAddressImage, replaceWrappedAddress } from './address-lines';
 
+function cropRegion(image: HTMLCanvasElement, top: number, bottom: number): HTMLCanvasElement {
+  const sourceHeight = image.height * (bottom - top);
+  const scale = Math.min(4, 2600 / Math.max(image.width, sourceHeight));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+  const drawing = canvas.getContext('2d');
+  if (!drawing) throw new Error('浏览器不支持 Canvas');
+  drawing.fillStyle = '#fff';
+  drawing.fillRect(0, 0, canvas.width, canvas.height);
+  drawing.drawImage(image, 0, image.height * top, image.width, sourceHeight, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
 export class OcrEngine {
   private worker?: Worker;
   private context?: RecognitionContext;
@@ -65,6 +79,16 @@ export class OcrEngine {
       const result = await worker.recognize(image, {}, { text: true, blocks: true });
       context.signal.throwIfAborted();
       let text = result.data.text;
+      const regions = [cropRegion(image, 0, 0.3), cropRegion(image, 0.45, 1)];
+      try {
+        for (const region of regions) {
+          await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT, tessedit_char_whitelist: '' });
+          const regional = await worker.recognize(region);
+          text += `\n${regional.data.text}`;
+        }
+      } finally {
+        for (const region of regions) { region.width = 0; region.height = 0; }
+      }
       const lines = result.data.blocks?.flatMap((block) => block.paragraphs.flatMap((paragraph) => paragraph.lines)) ?? [];
       for (const group of findWrappedAddresses(lines).slice(0, 4)) {
         context.signal.throwIfAborted();

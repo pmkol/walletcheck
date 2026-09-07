@@ -85,9 +85,9 @@ const ocrConfusions: Record<string, string[]> = {
 
 export function correctOcrAddress(text: string, expected: string, network: Network): string | undefined {
   if (!validateAddress(expected, network)) return undefined;
-  const candidates = text.match(/0[xX][^\s\n]{30,60}/g) ?? [];
+  const candidates = text.match(/0[xX][\s\S]{30,80}/g) ?? [];
   for (const candidate of candidates) {
-    const compact = candidate.replace(/[\s|·•,，;；_]/g, '');
+    const compact = candidate.replace(/[\s|·•,，;；_]/g, '').slice(0, expected.length);
     if (compact.length !== expected.length) continue;
     let corrections = 0;
     let valid = true;

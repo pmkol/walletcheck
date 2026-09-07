@@ -67,9 +67,12 @@ export function evaluateRecognition(
   const invalidQr = parsed.find((entry) => 'error' in entry);
   if (invalidQr && 'error' in invalidQr) return reject(invalidQr.error);
   if (!qrAddresses.length && parsed.some((entry) => 'ignored' in entry)) return reject('unsupported-qr');
-  if (textCandidates.some((address) => !validateAddress(address, options.network))) {
-    return reject('invalid-address');
+  const hasInvalidText = textCandidates.some((address) => !validateAddress(address, options.network));
+  if (hasInvalidText && !textAddresses.length && qrAddresses.length === 1) {
+    const corrected = correctOcrAddress(recognition.text, qrAddresses[0], options.network);
+    if (corrected) textAddresses.push(normalizeAddress(corrected, options.network));
   }
+  if (hasInvalidText && !textAddresses.length) return reject('invalid-address');
   if (qrAddresses.length > 1 || textAddresses.length > 1) return reject('multiple-addresses');
   if (!qrAddresses.length && !textAddresses.length) return reject('no-address');
   if (qrAddresses.length && textAddresses.length && qrAddresses[0] !== textAddresses[0]) {
