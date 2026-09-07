@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findWrappedAddresses, readReflowedAddress } from '../src/recognition/address-lines';
+import { findWrappedAddresses, readReflowedAddress, replaceWrappedAddress } from '../src/recognition/address-lines';
 import type { AddressLine } from '../src/recognition/address-lines';
 
 const first: AddressLine = {
@@ -10,6 +10,24 @@ const second: AddressLine = {
 };
 
 describe('wrapped EVM address OCR regions', () => {
+  const icon: AddressLine = { text: '(w)', bbox: { x0: 850, y0: 125, x1: 885, y1: 150 } };
+
+  it('ignores an interleaved side icon outside the address column', () => {
+    expect(findWrappedAddresses([first, icon, second])).toEqual([[first, second]]);
+  });
+
+  it('never skips intervening text inside the address column', () => {
+    expect(findWrappedAddresses([first, { ...icon, bbox: { ...icon.bbox, x0: 300, x1: 330 } }, second])).toEqual([]);
+  });
+
+  it('replaces only the re-read address lines and preserves other OCR evidence', () => {
+    const address = first.text.trim() + second.text.trim();
+    const text = `USDT\n${first.text.trim()}\n(w)\n${second.text.trim()}\nBNB Chain\nUSDC`;
+    expect(replaceWrappedAddress(text, [first, second], address)).toBe(`USDT\n${address}\n(w)\n\nBNB Chain\nUSDC`);
+    expect(replaceWrappedAddress(text, [first, second], address.replace('a', 'c'))).toBe(text);
+    const duplicate = `${text}\n${first.text.trim()}`;
+    expect(replaceWrappedAddress(duplicate, [first, second], address)).toBe(duplicate);
+  });
   it('finds adjacent centered address lines', () => {
     const centered = { ...second, bbox: { ...second.bbox, x0: 275, x1: 625 } };
     expect(findWrappedAddresses([first, centered])).toEqual([[first, centered]]);

@@ -2,7 +2,7 @@ import type { CheckerOptions, FailureReason, MetadataCheck, MetadataVerification
 
 const aliases: Record<Network, string[]> = {
   'ethereum': ['ethereum mainnet', 'ethereum', '以太坊'],
-  'bsc': ['bnb smart chain', 'binance smart chain', 'bsc', 'bep20', 'bep 20'],
+  'bsc': ['bnb smart chain', 'binance smart chain', 'bnb chain', 'bsc', 'bep20', 'bep 20'],
   'polygon': ['polygon pos', 'polygon'],
   'arbitrum': ['arbitrum one', 'arbitrum', 'arb one'],
   'optimism': ['op mainnet', 'optimism'],
@@ -18,7 +18,7 @@ const labelledAliases: Partial<Record<Network, string[]>> = {
 const knownCoins = ['USDT', 'USDT0', 'USDC', 'USDC.E', 'DAI', 'ETH', 'BTC', 'TRX', 'SOL', 'BNB', 'POL', 'MATIC', 'ARB', 'OP', 'DOGE', 'LTC', 'XRP', 'TON'];
 const networkLabel = /^(?:network|blockchain|chain|网络名称|收款网络|网络|链)(?:\s*[:：]\s*|\s+|$)(.*)$/i;
 const coinLabel = /^(?:coin|asset|currency|token|币种|资产)(?:\s*[:：]\s*|\s+|$)(.*)$/i;
-const unsupportedNetwork = /test\s*net|sepolia|goerli|holesky|hoodi|dev\s*net|signet|amoy|mumbai|nile|shasta|nova|orbit|zk\s*evm|beacon|bep\s*2(?!0)/i;
+const unsupportedNetwork = /test\s*net|sepolia|goerli|holesky|hoodi|dev\s*net|signet|amoy|mumbai|nile|shasta|nova|orbit|zk\s*evm|beacon|bep\s*2(?!0)|\bop\s*bnb\b/i;
 const warningText = /\b(?:not|don't|never|unsupported|avoid|fee|fees)\b|请勿|不支持|不要/i;
 
 function fold(value: string): string {
@@ -29,8 +29,8 @@ function escape(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function aliasPattern(alias: string): RegExp {
-  return new RegExp(`(?<![a-z0-9])${alias.split(' ').map(escape).join('\\s*')}(?![a-z0-9])`, 'i');
+function aliasPattern(alias: string, flags = 'i'): RegExp {
+  return new RegExp(`(?<![a-z0-9])${alias.split(' ').map(escape).join('\\s*')}(?![a-z0-9])`, flags);
 }
 
 function identifyNetworks(raw: string, labelled: boolean): string[] {
@@ -74,6 +74,13 @@ function labelledValues(lines: string[], label: RegExp): string[] {
   });
 }
 
+function stripNetworkNames(value: string): string {
+  for (const alias of Object.values(aliases).flat().filter((name) => name.includes(' '))) {
+    value = value.replace(aliasPattern(alias, 'ig'), '');
+  }
+  return value;
+}
+
 function check(expected: string, detected: string[]): MetadataCheck {
   const distinct = [...new Set(detected)];
   return {
@@ -96,10 +103,7 @@ export function verifyMetadata(text: string, options: CheckerOptions): MetadataV
   const coinFields = labelledValues(lines, coinLabel);
   const coinLines = lines.filter((line) => !coinLabel.test(line) && !coinFields.includes(line)
     && !warningText.test(line)).map((line) => {
-      let value = networkLabel.exec(line)?.[1] ?? line;
-      for (const alias of Object.values(aliases).flat().filter((name) => name.includes(' '))) {
-        value = value.replace(aliasPattern(alias), '');
-      }
+      const value = stripNetworkNames(networkLabel.exec(line)?.[1] ?? line);
       return networkLabel.test(line) || networkFields.includes(line)
         ? value.replace(/^(?:eth|btc|sol|trx|op|matic)$/i, '') : value;
     });
@@ -110,7 +114,7 @@ export function verifyMetadata(text: string, options: CheckerOptions): MetadataV
   });
   detectedCoins.push(...coinFields.filter(Boolean).flatMap((value) => {
     if (warningText.test(value)) return [value.toUpperCase()];
-    const found = symbols.filter((symbol) => new RegExp(`(?<![A-Z0-9._-])${escape(symbol)}(?![A-Z0-9._-])`, 'i').test(value));
+    const found = symbols.filter((symbol) => new RegExp(`(?<![A-Z0-9._-])${escape(symbol)}(?![A-Z0-9._-])`, 'i').test(stripNetworkNames(value)));
     return found.length ? found : [value.toUpperCase()];
   }));
   return { coin: check(expectedCoin, detectedCoins), network: check(options.network, detectedNetworks) };

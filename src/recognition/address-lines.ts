@@ -7,24 +7,41 @@ export function findWrappedAddresses(lines: AddressLine[]): AddressLine[][] {
   const groups: AddressLine[][] = [];
   for (let index = 0; index < lines.length - 1; index += 1) {
     const first = lines[index];
-    const second = lines[index + 1];
     const prefix = first.text.trim();
-    const suffix = second.text.trim();
-    if (!/^[0O]x[0-9a-fA-F]{8,38}$/.test(prefix) || !/^[0-9a-fA-F]{2,32}$/.test(suffix)
-      || prefix.length + suffix.length !== 42) continue;
-    const height = Math.max(first.bbox.y1 - first.bbox.y0, second.bbox.y1 - second.bbox.y0);
-    const gap = second.bbox.y0 - first.bbox.y1;
-    const aligned = Math.min(
-      Math.abs(first.bbox.x0 - second.bbox.x0),
-      Math.abs(first.bbox.x1 - second.bbox.x1),
-      Math.abs((first.bbox.x0 + first.bbox.x1 - second.bbox.x0 - second.bbox.x1) / 2),
-    ) <= height;
-    if (height > 0 && gap >= 0 && gap <= height * 2 && aligned) {
-      groups.push([first, second]);
-      index += 1;
+    if (!/^[0O]x[0-9a-fA-F]{8,38}$/.test(prefix)) continue;
+    const candidates: AddressLine[] = [];
+    for (let next = index + 1; next < Math.min(lines.length, index + 5); next += 1) {
+      const second = lines[next];
+      const suffix = second.text.trim();
+      if (!/^[0-9a-fA-F]{2,32}$/.test(suffix) || prefix.length + suffix.length !== 42) continue;
+      const height = Math.max(first.bbox.y1 - first.bbox.y0, second.bbox.y1 - second.bbox.y0);
+      const gap = second.bbox.y0 - first.bbox.y1;
+      const aligned = Math.min(
+        Math.abs(first.bbox.x0 - second.bbox.x0),
+        Math.abs(first.bbox.x1 - second.bbox.x1),
+        Math.abs((first.bbox.x0 + first.bbox.x1 - second.bbox.x0 - second.bbox.x1) / 2),
+      ) <= height;
+      const left = Math.min(first.bbox.x0, second.bbox.x0);
+      const right = Math.max(first.bbox.x1, second.bbox.x1);
+      const interrupted = lines.slice(index + 1, next).some((line) => line.bbox.x1 > left && line.bbox.x0 < right);
+      if (height > 0 && gap >= 0 && gap <= height * 2 && aligned && !interrupted) candidates.push(second);
     }
+    if (candidates.length === 1) groups.push([first, candidates[0]]);
   }
   return groups;
+}
+
+export function replaceWrappedAddress(text: string, lines: AddressLine[], address: string): string {
+  if (lines.length !== 2 || readReflowedAddress(address, lines) !== address) return text;
+  const matches = lines.map((line) => {
+    const escaped = line.text.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return [...text.matchAll(new RegExp(`^[ \\t]*${escaped}[ \\t]*\\r?$`, 'gm'))];
+  });
+  if (matches.some((entries) => entries.length !== 1)) return text;
+  const [first, second] = matches.map((entries) => entries[0]);
+  if (first.index >= second.index) return text;
+  return text.slice(0, first.index) + address + text.slice(first.index + first[0].length, second.index)
+    + text.slice(second.index + second[0].length);
 }
 
 export function readReflowedAddress(text: string, lines: AddressLine[]): string | undefined {

@@ -2,7 +2,7 @@ import { createWorker, OEM, PSM } from 'tesseract.js';
 import type { Worker } from 'tesseract.js';
 import type { RecognitionContext } from '../types';
 import { loadModel } from './model';
-import { findWrappedAddresses, readReflowedAddress, reflowAddressImage } from './address-lines';
+import { findWrappedAddresses, readReflowedAddress, reflowAddressImage, replaceWrappedAddress } from './address-lines';
 
 export class OcrEngine {
   private worker?: Worker;
@@ -84,8 +84,7 @@ export class OcrEngine {
             address = readReflowedAddress(constrained.data.text, group);
           }
           if (address) {
-            const pattern = group.map((line) => line.text.trim()).join('\\s+');
-            text = text.replace(new RegExp(pattern), address);
+            text = replaceWrappedAddress(text, group, address);
           }
         } finally {
           canvas.width = 0;

@@ -4,6 +4,34 @@ import { evaluateRecognition } from '../src/verification';
 import type { Network } from '../src/types';
 
 describe('network name matching', () => {
+  it.each([
+    'USDT\nBNB Chain', 'USDT 收款\n仅支持接收 BNB Chain 网络资产',
+    'USDT KFR\nIZ BNB Chain [4&7', 'usdt bnbchain',
+    'USDT BNB Chain BNB Chain', 'Coin: USDT (BNB Chain)',
+    'USDT\nNetwork: BNB Chain',
+  ])('recognizes BNB Chain as a network, not a second coin: %s', (text) => {
+    expect(verifyMetadata(text, { coin: 'USDT', network: 'bsc' })).toMatchObject({
+      coin: { status: 'matched', detected: ['USDT'] }, network: { status: 'matched', detected: ['bsc'] },
+    });
+  });
+
+  it.each(['USDT BNB BNB Chain', 'Coin: USDT BNB\nBNB Chain', 'USDT\nCoin: BNB\nBNB Chain'])(
+    'still rejects a genuine second BNB coin: %s', (text) => {
+      expect(verifyMetadata(text, { coin: 'USDT', network: 'bsc' }).coin.status).toBe('ambiguous');
+    },
+  );
+
+  it('can verify BNB itself when it is explicitly the coin', () => {
+    expect(verifyMetadata('Coin: BNB\nNetwork: BNB Chain', { coin: 'BNB', network: 'bsc' })).toMatchObject({
+      coin: { status: 'matched' }, network: { status: 'matched' },
+    });
+  });
+
+  it.each(['USDT BNB Chain opBNB', 'USDT BNB Chain\nopBNB', 'USDT BNB Chain Testnet', 'USDT BNB Beacon Chain'])(
+    'does not confuse other BNB networks with BSC: %s', (text) => {
+      expect(verifyMetadata(text, { coin: 'USDT', network: 'bsc' }).network.status).not.toBe('matched');
+    },
+  );
   it.each<[string, Network]>([
     ['USDC arb one', 'arbitrum'], ['USDC OP Mainnet', 'optimism'],
     ['USDC BNB Smart Chain', 'bsc'],
