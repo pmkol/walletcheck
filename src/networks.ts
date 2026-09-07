@@ -5,6 +5,7 @@ import { bytesToHex } from '@noble/hashes/utils.js';
 import type { Network } from './types';
 
 const checkedBase58 = base58check(sha256);
+const maxOcrAddressEdits = 6;
 
 export const networks: Record<Network, { label: string; chainId?: string }> = {
   'ethereum': { label: 'Ethereum', chainId: '1' },
@@ -122,37 +123,38 @@ function ocrAddressCandidates(text: string): string[] {
 }
 
 function matchesOcrAddress(actual: string, expected: string): boolean {
-  const maxEdits = 2;
-  const memo = new Map<string, number | undefined>();
-  const visit = (actualIndex: number, expectedIndex: number, edits: number): number | undefined => {
-    if (edits > maxEdits) return undefined;
-    if (actualIndex === actual.length) return expectedIndex === expected.length ? edits : undefined;
-    if (expectedIndex === expected.length) {
-      return actual.slice(actualIndex).split('').every((character) =>
-        ignorableOcrAddressCharacters.has(character))
-        ? edits + actual.length - actualIndex <= maxEdits ? edits + actual.length - actualIndex : undefined
-        : undefined;
+  // The QR code is the authoritative value. OCR is allowed a small number of
+  // substitutions (including glyph confusions) only when it still supplies
+  // an almost complete address body; a different complete valid address is
+  // handled separately and remains a conflict.
+  const maxEdits = maxOcrAddressEdits;
+  const width = expected.length + 1;
+  const differentLength = actual.length !== expected.length;
+  let previous = Array.from({ length: width }, (_, index) => index);
+  for (let actualIndex = 1; actualIndex <= actual.length; actualIndex += 1) {
+    const current = new Array<number>(width).fill(maxEdits + 1);
+    current[0] = actualIndex;
+    for (let expectedIndex = 1; expectedIndex <= expected.length; expectedIndex += 1) {
+      const actualCharacter = actual[actualIndex - 1];
+      const expectedCharacter = expected[expectedIndex - 1];
+      const same = actualCharacter.toLowerCase() === expectedCharacter.toLowerCase();
+      const confused = (ocrConfusions[expectedCharacter] ?? ocrConfusions[expectedCharacter.toUpperCase()])
+        ?.includes(actualCharacter) ?? false;
+      const genericSubstitution = /[0-9a-z]/i.test(actualCharacter)
+        && actualCharacter.toLowerCase() !== 'o' && /[0-9a-f]/i.test(expectedCharacter);
+      const substitution = same ? 0 : confused || genericSubstitution ? 1 : maxEdits + 1;
+      const deletion = differentLength || ignorableOcrAddressCharacters.has(actualCharacter)
+        ? previous[expectedIndex] + 1 : maxEdits + 1;
+      const insertion = differentLength ? current[expectedIndex - 1] + 1 : maxEdits + 1;
+      current[expectedIndex] = Math.min(
+        deletion,
+        insertion,
+        previous[expectedIndex - 1] + substitution,
+      );
     }
-    const key = `${actualIndex}:${expectedIndex}:${edits}`;
-    if (memo.has(key)) return memo.get(key);
-    const actualCharacter = actual[actualIndex];
-    const expectedCharacter = expected[expectedIndex];
-    const same = actualCharacter.toLowerCase() === expectedCharacter.toLowerCase();
-    let result: number | undefined;
-    if (same) result = visit(actualIndex + 1, expectedIndex + 1, edits);
-    if (result === undefined) {
-      const targetClass = ocrConfusions[expectedCharacter] ?? ocrConfusions[expectedCharacter.toUpperCase()];
-      if (targetClass?.includes(actualCharacter)) {
-        result = visit(actualIndex + 1, expectedIndex + 1, edits + 1);
-      }
-    }
-    if (result === undefined && ignorableOcrAddressCharacters.has(actualCharacter)) {
-      result = visit(actualIndex + 1, expectedIndex, edits + 1);
-    }
-    memo.set(key, result);
-    return result;
-  };
-  return visit(0, 0, 0) !== undefined;
+    previous = current;
+  }
+  return previous[expected.length] <= maxEdits;
 }
 
 /** Returns a bounded QR-guided repair for OCR text that is otherwise recoverable. */
@@ -162,7 +164,10 @@ export function correctOcrAddress(text: string, expected: string, network: Netwo
   for (const candidate of candidates) {
     const prefix = candidate.slice(0, 2);
     if (!/^[0O][xX]$/.test(prefix)) continue;
-    if (matchesOcrAddress(candidate.slice(2), expected.slice(2))) return expected;
+    const body = candidate.slice(2);
+    if (body.length < expected.length - maxOcrAddressEdits
+      || body.length > expected.length + maxOcrAddressEdits) continue;
+    if (matchesOcrAddress(body, expected.slice(2))) return expected;
   }
   return undefined;
 }

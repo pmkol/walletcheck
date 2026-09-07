@@ -7,6 +7,7 @@ import type { AddressLine } from './address-lines';
 const LANGUAGES = ['eng', 'chi_sim', 'chi_tra'] as const;
 type Language = typeof LANGUAGES[number];
 type OCRClientConstructor = new (init: { workerURL: string }) => OCRClient;
+const mixedEvidenceToken = /(?<![a-z0-9])(?:USDT0?|USDC(?:\.E)?|DAI|ETH|BTC|TRX|SOL|BNB|POL|MATIC|ARB|OP|DOGE|LTC|XRP|TON|ARBITRUM|ETHEREUM|TRON|BITCOIN|SOLANA|POLYGON|OPTIMISM|BINANCE)(?![a-z0-9])/i;
 
 async function loadOcrClient(base: URL): Promise<OCRClientConstructor> {
   const module = await import(/* @vite-ignore */ new URL('tesseract-lib.js', base).href) as {
@@ -43,14 +44,14 @@ function lineFromTextItem(item: TextItem): AddressLine {
   };
 }
 
-function onlyChineseEvidence(text: string): string {
+export function onlyChineseEvidence(text: string): string {
   return text.split(/\r?\n/).map((line) => {
     if (!/[\u3400-\u9fff]/.test(line)) return '';
-    // Keep Chinese-only evidence and known Chinese aliases. Mixed-script lines
-    // are discarded: a single misread Han glyph in an English field must not
-    // turn a clear value into an unknown/ambiguous metadata value.
+    // Keep Chinese-only evidence and mixed lines containing a known coin or
+    // network token. Unknown mixed-script lines are discarded so a stray Han
+    // glyph in an English field cannot create ambiguous metadata evidence.
     const latinRemainder = line.replace(/[\u3400-\u9fff]/g, '').trim();
-    if (latinRemainder && !/以太坊/.test(line)) return '';
+    if (latinRemainder && !/以太坊/.test(line) && !mixedEvidenceToken.test(latinRemainder)) return '';
     return line.trim();
   }).filter(Boolean).join('\n');
 }

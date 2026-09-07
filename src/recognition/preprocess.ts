@@ -34,7 +34,7 @@ export function prepareOcrImage(image: HTMLCanvasElement): HTMLCanvasElement {
   const drawing = canvas.getContext('2d', { willReadFrequently: true });
   if (!drawing) throw new Error('浏览器不支持 Canvas');
   if (typeof drawing.filter === 'string') {
-    drawing.filter = 'grayscale(1) invert(1)';
+    drawing.filter = darkBackground ? 'grayscale(1) invert(1)' : 'grayscale(1)';
     drawing.drawImage(image, 0, 0, canvas.width, canvas.height);
     return canvas;
   }
@@ -43,9 +43,10 @@ export function prepareOcrImage(image: HTMLCanvasElement): HTMLCanvasElement {
   for (let offset = 0; offset < pixels.data.length; offset += 4) {
     const luminance = Math.round(pixels.data[offset] * 0.2126
       + pixels.data[offset + 1] * 0.7152 + pixels.data[offset + 2] * 0.0722);
-    pixels.data[offset] = 255 - luminance;
-    pixels.data[offset + 1] = 255 - luminance;
-    pixels.data[offset + 2] = 255 - luminance;
+    const value = darkBackground ? 255 - luminance : luminance;
+    pixels.data[offset] = value;
+    pixels.data[offset + 1] = value;
+    pixels.data[offset + 2] = value;
   }
   drawing.putImageData(pixels, 0, 0);
   return canvas;

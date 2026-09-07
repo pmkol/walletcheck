@@ -67,10 +67,36 @@ function identifyNetworks(raw: string, labelled: boolean): string[] {
   return found.length ? [...new Set(found)] : labelled && value ? [value] : [];
 }
 
-function labelledValues(lines: string[], label: RegExp): string[] {
+function isNetworkValue(value: string): boolean {
+  if (identifyNetworks(value, false).length) return true;
+  const folded = fold(value);
+  return Object.values(labelledAliases).flat().some((alias) => aliasPattern(alias).test(folded));
+}
+
+function exactCoinEvidence(line: string, symbol: string, expectedCoin: string, symbols: string[]): boolean {
+  if (symbol === expectedCoin) return true;
+  if (identifyNetworks(line, false).length) return true;
+  const token = new RegExp(`(?<![A-Z0-9._-])${escape(symbol)}(?![A-Z0-9._-])`, 'i').exec(line)?.[0];
+  if (!token) return false;
+  // Deliberate coin headings use the canonical uppercase ticker. A title-case
+  // token embedded in an otherwise unrecognized OCR line is commonly noise
+  // (for example `RTFH DO Eth`) and is not enough to create a conflict.
+  if (token !== token.toUpperCase()) {
+    const hasOtherCoin = symbols.some((other) => other !== symbol
+      && new RegExp(`(?<![A-Z0-9._-])${escape(other)}(?![A-Z0-9._-])`, 'i').test(line));
+    if (!hasOtherCoin && !/[0-9]/.test(line)) return false;
+  }
+  return true;
+}
+
+function labelledValues(lines: string[], label: RegExp, acceptsNextLine: (value: string) => boolean = () => true): string[] {
   return lines.flatMap((line, index) => {
     const match = label.exec(line);
-    return match ? [match[1].trim() || lines[index + 1] || ''] : [];
+    if (!match) return [];
+    const inline = match[1].trim();
+    if (inline) return [inline];
+    const next = lines[index + 1] ?? '';
+    return [acceptsNextLine(next) ? next : ''];
   });
 }
 
@@ -85,8 +111,9 @@ function stripNetworkAnnotations(value: string): string {
   return value.replace(/[（(]\s*usdt0\s*[）)]/ig, '');
 }
 
-function noisyCoinMentions(lines: string[], symbols: string[]): string[] {
+function noisyCoinMentions(lines: string[], symbols: string[], expectedCoin: string, networkMatched: boolean): string[] {
   const occurrences = new Map<string, Set<string>>();
+  const strongOccurrences = new Set<string>();
   const ordered = [...symbols].sort((first, second) => second.length - first.length);
   for (const line of lines) {
     if (warningText.test(line) || networkLabel.test(line) || identifyNetworks(line, false).length) continue;
@@ -104,10 +131,20 @@ function noisyCoinMentions(lines: string[], symbols: string[]): string[] {
       const values = occurrences.get(symbol) ?? new Set<string>();
       values.add(value);
       occurrences.set(symbol, values);
+      const compact = value.replace(/\s+/g, '');
+      const prefix = compact.slice(0, index);
+      const suffix = compact.slice(index + needle.length);
+      if (symbol === expectedCoin && networkMatched && /^[a-z]+$/i.test(compact)
+        && prefix.length <= 1 && suffix.length >= 1 && suffix.length <= 8) {
+        strongOccurrences.add(symbol);
+      }
     }
   }
-  // Require repeated evidence before accepting a noisy OCR substring.
-  return [...occurrences.entries()].filter(([, values]) => values.size >= 2).map(([symbol]) => symbol);
+  // Repeated evidence is preferred. A single short, heading-like noisy token
+  // is also safe when the requested network is already clearly recognized.
+  return [...occurrences.entries()]
+    .filter(([symbol, values]) => values.size >= 2 || strongOccurrences.has(symbol))
+    .map(([symbol]) => symbol);
 }
 
 function check(expected: string, detected: string[]): MetadataCheck {
@@ -123,7 +160,8 @@ function check(expected: string, detected: string[]): MetadataCheck {
 export function verifyMetadata(text: string, options: CheckerOptions): MetadataVerification {
   const expectedCoin = options.coin.trim().toUpperCase();
   const lines = text.normalize('NFKC').replace(/https?:\/\/\S+/gi, '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  const networkFields = labelledValues(lines, networkLabel);
+  const networkFields = labelledValues(lines, networkLabel,
+    isNetworkValue);
   const detectedNetworks = [
     ...networkFields.flatMap((value) => identifyNetworks(value, true)),
     ...lines.filter((line) => !networkLabel.test(line) && !networkFields.includes(line))
@@ -138,8 +176,9 @@ export function verifyMetadata(text: string, options: CheckerOptions): MetadataV
     });
   const symbols = [...new Set([...knownCoins, expectedCoin])];
   const detectedCoins = coinLines.flatMap((line) => {
-    const found = symbols.filter((symbol) => new RegExp(`(?<![A-Z0-9._-])${escape(symbol)}(?![A-Z0-9._-])`, 'i')
-      .test(stripNetworkAnnotations(line)));
+    const value = stripNetworkAnnotations(line);
+    const found = symbols.filter((symbol) => exactCoinEvidence(value, symbol, expectedCoin, symbols)
+      && new RegExp(`(?<![A-Z0-9._-])${escape(symbol)}(?![A-Z0-9._-])`, 'i').test(value));
     return found;
   });
   detectedCoins.push(...coinFields.filter(Boolean).flatMap((value) => {
@@ -148,7 +187,8 @@ export function verifyMetadata(text: string, options: CheckerOptions): MetadataV
       .test(stripNetworkAnnotations(stripNetworkNames(value))));
     return found.length ? found : [value.toUpperCase()];
   }));
-  detectedCoins.push(...noisyCoinMentions(coinLines, symbols));
+  detectedCoins.push(...noisyCoinMentions(coinLines, symbols, expectedCoin,
+    detectedNetworks.includes(options.network)));
   return { coin: check(expectedCoin, detectedCoins), network: check(options.network, detectedNetworks) };
 }
 

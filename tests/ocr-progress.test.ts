@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createOcrProgress } from '../src/recognition/ocr';
+import { createOcrProgress, onlyChineseEvidence } from '../src/recognition/ocr';
 
 describe('OCR progress aggregation', () => {
   it('keeps progress monotonic across independent passes and formats', () => {
@@ -15,5 +15,9 @@ describe('OCR progress aggregation', () => {
     expect(values.length).toBeGreaterThan(0);
     expect(values.every((value, index) => index === 0 || value >= values[index - 1])).toBe(true);
     expect(values.at(-1)).toBe(1);
+  });
+
+  it('preserves known coin and network tokens in mixed Chinese lines', () => {
+    expect(onlyChineseEvidence('充值 USDT\n网络 Arbitrum One\n随机 ABC')).toBe('充值 USDT\n网络 Arbitrum One');
   });
 });

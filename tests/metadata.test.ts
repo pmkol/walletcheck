@@ -142,11 +142,31 @@ describe('network name matching', () => {
     expect(verifyMetadata('Network: Ethereum\nNetwork: Base', { coin: 'USDT', network: 'ethereum' }).network.status).toBe('ambiguous');
     expect(verifyMetadata('Network: Ethereum / Base', { coin: 'USDT', network: 'ethereum' }).network.status).toBe('ambiguous');
   });
+
+  it('does not use an unrelated following label as a network value', () => {
+    expect(verifyMetadata('充值 USDT\n网络\n充值 地址\nARBITRUM', {
+      coin: 'USDT', network: 'arbitrum',
+    })).toMatchObject({
+      coin: { status: 'matched' }, network: { status: 'matched', detected: ['arbitrum'] },
+    });
+  });
 });
 
 describe('coin symbol checks', () => {
   it('accepts a repeated OCR-noisy coin token from mixed-script headings', () => {
     expect(verifyMetadata('BUSDTREZINE\nJJUSDTREZEIMZE\nARBITRUM', {
+      coin: 'USDT', network: 'arbitrum',
+    })).toMatchObject({ coin: { status: 'matched', detected: ['USDT'] }, network: { status: 'matched' } });
+  });
+
+  it('accepts one short noisy coin heading when the network is explicit', () => {
+    expect(verifyMetadata('BUSDTREZITZE\nArbitrum', {
+      coin: 'USDT', network: 'arbitrum',
+    })).toMatchObject({ coin: { status: 'matched', detected: ['USDT'] }, network: { status: 'matched' } });
+  });
+
+  it('ignores a title-case coin hallucination in an otherwise noisy OCR line', () => {
+    expect(verifyMetadata('USDT\nArbitrum\nRTFH DO Eth', {
       coin: 'USDT', network: 'arbitrum',
     })).toMatchObject({ coin: { status: 'matched', detected: ['USDT'] }, network: { status: 'matched' } });
   });
@@ -234,5 +254,15 @@ describe('OCR address correction', () => {
       text: 'USDT\nArbitrum One\n0x1234567890123456789012345678901234567890',
     }, { coin: 'USDT', network: 'arbitrum', assetBaseUrl: '' });
     expect(result.status).toBe('matched');
+  });
+
+  it('repairs a mostly complete address with several OCR character substitutions', () => {
+    const address = '0xa359b7e6b5b23dd23cb11f644d23676de02987ff';
+    const text = [
+      'BUSDTREZITZE', 'ARBITRUM',
+      'Oxa255b7e6b5b23dd23ch11f644d', '23676de0295711',
+    ].join('\n');
+    expect(evaluateRecognition({ qrPayloads: [address], text }, { coin: 'USDT', network: 'arbitrum' }))
+      .toMatchObject({ status: 'matched', addressStatus: 'matched', payload: { address } });
   });
 });
