@@ -106,7 +106,7 @@ describe('network name matching', () => {
     })).toMatchObject({ coin: { status: 'matched' }, network: { status: 'ambiguous' } });
   });
   it.each<[string, Network]>([
-    ['arbitrum', 'arbitrum'], ['ARBITRUM ONE', 'arbitrum'],
+    ['arbitrum', 'arbitrum'], ['ARBI', 'arbitrum'], ['ARBITRUM ONE', 'arbitrum'],
     ['arbitrum_one', 'arbitrum'], ['ArbitrumOne (USDT0)', 'arbitrum'],
     ['Network: Arbitrum One (USDTO0)', 'arbitrum'],
     ['Network:\nETH', 'ethereum'], ['Ethereum (ERC20)', 'ethereum'],

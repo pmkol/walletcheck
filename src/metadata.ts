@@ -5,7 +5,7 @@ const aliases: Record<Network, string[]> = {
   'ethereum': ['ethereum mainnet', 'ethereum', '以太坊'],
   'bsc': ['bnb smart chain', 'binance smart chain', 'bnb chain', 'bsc', 'bep20', 'bep 20'],
   'polygon': ['polygon pos', 'polygon'],
-  'arbitrum': ['arbitrum one', 'arbitrum', 'arb one'],
+  'arbitrum': ['arbitrum one', 'arbitrum', 'arb one', 'arbi'],
   'optimism': ['op mainnet', 'optimism'],
   'base': ['base mainnet', 'base'],
   'tron': ['tron mainnet', 'tron', 'trc20', 'trc 20'],

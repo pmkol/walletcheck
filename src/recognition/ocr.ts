@@ -7,7 +7,7 @@ import type { AddressLine } from './address-lines';
 const LANGUAGES = ['eng', 'chi_sim', 'chi_tra'] as const;
 type Language = typeof LANGUAGES[number];
 type OCRClientConstructor = new (init: { workerURL: string }) => OCRClient;
-const mixedEvidenceToken = /(?<![a-z0-9])(?:USDT0?|USDC(?:\.E)?|DAI|ETH|BTC|TRX|SOL|BNB|POL|MATIC|ARB|OP|DOGE|LTC|XRP|TON|ARBITRUM|ETHEREUM|TRON|BITCOIN|SOLANA|POLYGON|OPTIMISM|BINANCE)(?![a-z0-9])/i;
+const mixedEvidenceToken = /(?<![a-z0-9])(?:USDT0?|USDC(?:\.E)?|DAI|ETH|BTC|TRX|SOL|BNB|POL|MATIC|ARB|OP|DOGE|LTC|XRP|TON|ARBI|ARBITRUM|ETHEREUM|TRON|BITCOIN|SOLANA|POLYGON|OPTIMISM|BINANCE)(?![a-z0-9])/i;
 
 async function loadOcrClient(base: URL): Promise<OCRClientConstructor> {
   const module = await import(/* @vite-ignore */ new URL('tesseract-lib.js', base).href) as {

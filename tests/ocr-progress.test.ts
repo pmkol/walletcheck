@@ -18,6 +18,6 @@ describe('OCR progress aggregation', () => {
   });
 
   it('preserves known coin and network tokens in mixed Chinese lines', () => {
-    expect(onlyChineseEvidence('充值 USDT\n网络 Arbitrum One\n随机 ABC')).toBe('充值 USDT\n网络 Arbitrum One');
+    expect(onlyChineseEvidence('充值 USDT\n网络 ARBI\n网络 Arbitrum One\n随机 ABC')).toBe('充值 USDT\n网络 ARBI\n网络 Arbitrum One');
   });
 });
