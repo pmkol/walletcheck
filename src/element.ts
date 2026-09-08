@@ -1,5 +1,6 @@
 import { createWalletChecker } from './checker';
 import type { WalletChecker } from './checker';
+import { displayedCoinValues } from './metadata';
 import { isNetwork, networks } from './networks';
 import type { FailureReason, Stage, VerificationResult } from './types';
 import { styles } from './ui/styles';
@@ -321,7 +322,8 @@ export class WalletCheckElement extends HTMLElement {
     this.get('#metadata').hidden = false;
     for (const field of ['coin', 'network'] as const) {
       const check = result.metadata[field];
-      const detected = check.detected.map((value) => isNetwork(value) ? networks[value].label : value).join('、');
+      const values = field === 'coin' ? displayedCoinValues(check) : check.detected;
+      const detected = values.map((value) => isNetwork(value) ? networks[value].label : value).join('、');
       this.showCheck(field, check.status === 'matched', labels[check.status]);
       this.get(`#result-${field}`).textContent = detected;
     }

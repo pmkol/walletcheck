@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { verifyMetadata } from '../src/metadata';
+import { displayedCoinValues, verifyMetadata } from '../src/metadata';
 import { evaluateRecognition } from '../src/verification';
 import type { Network } from '../src/types';
 
@@ -16,8 +16,8 @@ describe('network name matching', () => {
   });
 
   it.each(['USDT BNB BNB Chain', 'Coin: USDT BNB\nBNB Chain', 'USDT\nCoin: BNB\nBNB Chain'])(
-    'still rejects a genuine second BNB coin: %s', (text) => {
-      expect(verifyMetadata(text, { coin: 'USDT', network: 'bsc' }).coin.status).toBe('ambiguous');
+    'accepts the configured coin alongside another ticker: %s', (text) => {
+      expect(verifyMetadata(text, { coin: 'USDT', network: 'bsc' }).coin.status).toBe('matched');
     },
   );
 
@@ -62,8 +62,8 @@ describe('network name matching', () => {
   it.each([
     'USDC USDT Arbitrum', 'Coin: USDC\nUSDT\nNetwork: Arbitrum',
     'USDC Arbitrum\nUSDC.E', 'USDC Arbitrum\nUSDT0',
-  ])('rejects competing coin words anywhere: %s', (text) => {
-    expect(verifyMetadata(text, { coin: 'USDC', network: 'arbitrum' }).coin.status).toBe('ambiguous');
+  ])('accepts the configured coin among competing ticker words: %s', (text) => {
+    expect(verifyMetadata(text, { coin: 'USDC', network: 'arbitrum' }).coin.status).toBe('matched');
   });
 
   it.each([
@@ -103,7 +103,7 @@ describe('network name matching', () => {
   it('keeps conflicts between combined headings and explicit fields', () => {
     expect(verifyMetadata('USDC (Arbitrum One)\nNetwork: Ethereum\nCoin: USDT', {
       coin: 'USDC', network: 'arbitrum',
-    })).toMatchObject({ coin: { status: 'ambiguous' }, network: { status: 'ambiguous' } });
+    })).toMatchObject({ coin: { status: 'matched' }, network: { status: 'ambiguous' } });
   });
   it.each<[string, Network]>([
     ['arbitrum', 'arbitrum'], ['ARBITRUM ONE', 'arbitrum'],
@@ -171,6 +171,32 @@ describe('coin symbol checks', () => {
     })).toMatchObject({ coin: { status: 'matched', detected: ['USDT'] }, network: { status: 'matched' } });
   });
 
+  it('matches the requested coin when one screenshot line lists several tickers', () => {
+    expect(verifyMetadata('币种：✕ USDC、OP、USDC.E\n网络：Arbitrum One', {
+      coin: 'USDC', network: 'arbitrum',
+    })).toMatchObject({
+      coin: { status: 'matched', detected: ['USDC', 'USDC.E', 'OP'] },
+      network: { status: 'matched' },
+    });
+  });
+
+  it('reports a mismatch when a multi-coin list omits the requested coin', () => {
+    const result = verifyMetadata('币种：USDC、OP、USDC.E\n网络：Arbitrum One', {
+      coin: 'USDT', network: 'arbitrum',
+    });
+    expect(result).toMatchObject({ coin: { status: 'mismatch', detected: ['USDC', 'USDC.E', 'OP'] } });
+    expect(displayedCoinValues(result.coin)).toEqual(['USDC']);
+  });
+
+  it('displays only the matched coin and hides unrelated OCR values on mismatch', () => {
+    expect(displayedCoinValues({
+      expected: 'USDC', status: 'matched', detected: ['USDC', 'OP', 'USDC.E'],
+    })).toEqual(['USDC']);
+    expect(displayedCoinValues({
+      expected: 'USDT', status: 'mismatch', detected: ['UNKNOWN LABEL', 'USDC', 'OP', 'USDC.E'],
+    })).toEqual(['USDC']);
+  });
+
   it('ignores symbol case but not symbol suffixes', () => {
     expect(verifyMetadata('Coin: usdt', { coin: 'USDT', network: 'ethereum' }).coin.status).toBe('matched');
     for (const coin of ['USDT0', 'USDTO', 'USDC', 'XUSDT', 'USDT.E']) {
@@ -189,7 +215,7 @@ describe('coin symbol checks', () => {
 
   it('does not use an address substring or missing fields as metadata evidence', () => {
     expect(verifyMetadata('0xabcdef0123456789012345678901234567890123', { coin: 'USDT', network: 'ethereum' }).coin.status).toBe('missing');
-    expect(verifyMetadata('Coin: USDT\nCoin: USDC', { coin: 'USDT', network: 'ethereum' }).coin.status).toBe('ambiguous');
+    expect(verifyMetadata('Coin: USDT\nCoin: USDC', { coin: 'USDT', network: 'ethereum' }).coin.status).toBe('matched');
   });
 
   it('does not treat warning text or negated fields as a verified coin', () => {

@@ -1,4 +1,5 @@
 import { networks } from '../src/index';
+import { projectCoins } from '../src/coins';
 import type { WalletCheckModalOptions } from '../src/modal';
 import { createLocalizer, resolveLocale } from '../src/i18n';
 import { translateDemo } from './locales';
@@ -35,6 +36,7 @@ const copyStatus = document.querySelector<HTMLElement>('#copy-status')!;
 const debugMode = document.querySelector<HTMLInputElement>('#debug-mode')!;
 const debugOutput = document.querySelector<HTMLElement>('#debug-output')!;
 
+for (const coin of projectCoins) coinSelect.add(new Option(coin, coin));
 for (const [value, config] of Object.entries(networks)) {
   networkSelect.add(new Option(config.label, value));
 }

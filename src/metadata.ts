@@ -1,4 +1,5 @@
 import type { CheckerOptions, FailureReason, MetadataCheck, MetadataVerification, Network } from './types';
+import { isProjectCoin } from './coins';
 
 const aliases: Record<Network, string[]> = {
   'ethereum': ['ethereum mainnet', 'ethereum', '以太坊'],
@@ -20,6 +21,12 @@ const networkLabel = /^(?:network|blockchain|chain|网络名称|收款网络|网
 const coinLabel = /^(?:coin|asset|currency|token|币种|资产)(?:\s*[:：]\s*|\s+|$)(.*)$/i;
 const unsupportedNetwork = /test\s*net|sepolia|goerli|holesky|hoodi|dev\s*net|signet|amoy|mumbai|nile|shasta|nova|orbit|zk\s*evm|beacon|bep\s*2(?!0)|\bop\s*bnb\b/i;
 const warningText = /\b(?:not|don't|never|unsupported|avoid|fee|fees)\b|请勿|不支持|不要/i;
+
+export function displayedCoinValues(check: MetadataCheck): string[] {
+  if (check.status === 'matched') return [check.expected];
+  return [...new Set(check.detected.map((value) => value.trim().toUpperCase())
+    .filter(isProjectCoin))];
+}
 
 function fold(value: string): string {
   return value.normalize('NFKC').toLowerCase().replace(/[_-]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -147,12 +154,14 @@ function noisyCoinMentions(lines: string[], symbols: string[], expectedCoin: str
     .map(([symbol]) => symbol);
 }
 
-function check(expected: string, detected: string[]): MetadataCheck {
+function check(expected: string, detected: string[], allowAdditional = false): MetadataCheck {
   const distinct = [...new Set(detected)];
   return {
     expected, detected: distinct,
     status: !distinct.length ? 'missing'
-      : distinct.length > 1 || distinct[0].startsWith('ambiguous:') ? 'ambiguous'
+      : distinct[0].startsWith('ambiguous:') ? 'ambiguous'
+      : allowAdditional ? (distinct.includes(expected) ? 'matched' : 'mismatch')
+      : distinct.length > 1 ? 'ambiguous'
       : distinct[0] === expected ? 'matched' : 'mismatch',
   };
 }
@@ -189,7 +198,11 @@ export function verifyMetadata(text: string, options: CheckerOptions): MetadataV
   }));
   detectedCoins.push(...noisyCoinMentions(coinLines, symbols, expectedCoin,
     detectedNetworks.includes(options.network)));
-  return { coin: check(expectedCoin, detectedCoins), network: check(options.network, detectedNetworks) };
+  // The screenshot may legitimately contain several tickers (for example a
+  // wallet page listing USDC, OP, and USDC.E). Only the configured coin needs
+  // to be present; additional tickers are retained for debug visibility but
+  // do not make the configured coin ambiguous.
+  return { coin: check(expectedCoin, detectedCoins, true), network: check(options.network, detectedNetworks) };
 }
 
 export function metadataFailure(metadata: MetadataVerification): FailureReason | undefined {

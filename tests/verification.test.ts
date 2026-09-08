@@ -10,7 +10,7 @@ const metadata = '\nCoin: USDT\nNetwork: Ethereum';
 describe('cross-check rules', () => {
   it.each([
     'USDC Ethereum', 'USDT Arbitrum', 'USDC Arbitrum', '',
-    'USDT USDC Ethereum', 'USDT Ethereum Arbitrum',
+    'USDT Ethereum Arbitrum',
   ])('preserves successful address verification despite metadata failure: %s', (text) => {
     expect(evaluateRecognition({ qrPayloads: [address], text: `${address}\n${text}` }, options))
       .toMatchObject({ status: 'rejected', addressVerified: true });
