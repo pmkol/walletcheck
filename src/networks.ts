@@ -130,11 +130,74 @@ function ocrAddressCandidates(text: string): string[] {
   return [...new Set(candidates)];
 }
 
+function rawOcrAddressCandidates(text: string): string[] {
+  const lines = text.split(/\r?\n/).map((line) => line.replace(/\s+/g, ''));
+  const candidates: string[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const prefix = lines[index];
+    if (!/^[0O][xX]/.test(prefix) || prefix.length < 10) continue;
+    candidates.push(prefix);
+    let next = index + 1;
+    while (next < lines.length && !lines[next]) next += 1;
+    if (next < lines.length) candidates.push(prefix + lines[next]);
+  }
+  return [...new Set(candidates)];
+}
+
+function matchesQrWithSymbolPlaceholders(candidate: string, expected: string): boolean {
+  if (!/^[0O][xX]/.test(candidate)) return false;
+  const actual = [...candidate.slice(2)];
+  const target = [...expected.slice(2).toLowerCase()];
+  const maxSymbolEdits = 2;
+  let states = new Map<number, number>([[0, 0]]);
+  for (const character of actual) {
+    const next = new Map<number, number>();
+    const update = (position: number, edits: number) => {
+      if (edits > maxSymbolEdits) return;
+      next.set(position, Math.min(next.get(position) ?? Infinity, edits));
+    };
+    for (const [position, edits] of states) {
+      if (/[0-9a-z]/i.test(character)) {
+        if (character.toLowerCase() === target[position]) update(position + 1, edits);
+      } else if (isIgnorableOcrAddressCharacter(character)) {
+        update(position, edits + 1);
+        if (position < target.length) update(position + 1, edits + 1);
+      }
+    }
+    states = next;
+    if (!states.size) return false;
+  }
+  return (states.get(target.length) ?? Infinity) <= maxSymbolEdits;
+}
+
 // Some wallet screens intentionally show only the address prefix and suffix.
 // Keep this QR-guided: hidden characters are never inferred from OCR alone.
 function abbreviatedOcrAddressCandidates(text: string): Array<{ prefix: string; suffix: string }> {
   const pattern = /(?<![a-zA-Z0-9])([0O][xX][0-9a-fA-F]{4,38})\s*(?:\.{2,}|…|⋯)\s*([0-9a-fA-F]{4,40})(?![a-zA-Z0-9])/g;
   return [...text.matchAll(pattern)].map((match) => ({ prefix: match[1], suffix: match[2] }));
+}
+
+/** Returns true only when one OCR pass supplies strong evidence for the QR address. */
+export function hasMatchingOcrAddress(text: string, expected: string, network: Network): boolean {
+  if (!networks[network].chainId || !validateAddress(expected, network)) return false;
+  const expectedBody = expected.slice(2).toLowerCase();
+  const complete = ocrAddressCandidates(text).some((candidate) => {
+    if (!/^[0O][xX][0-9a-fA-F]{40}$/.test(candidate)) return false;
+    return candidate.slice(2).toLowerCase() === expectedBody;
+  });
+  if (complete) return true;
+  // A punctuation glyph may be either extra noise or an unreadable character
+  // placeholder. All visible letters and digits must still align with the QR.
+  if (rawOcrAddressCandidates(text).some((candidate) => matchesQrWithSymbolPlaceholders(candidate, expected))) {
+    return true;
+  }
+  return abbreviatedOcrAddressCandidates(text).some((candidate) => {
+    const prefix = candidate.prefix.slice(2).toLowerCase();
+    const suffix = candidate.suffix.toLowerCase();
+    return prefix.length >= 4 && suffix.length >= 4
+      && prefix.length + suffix.length < expectedBody.length
+      && expectedBody.startsWith(prefix) && expectedBody.endsWith(suffix);
+  });
 }
 
 function matchesOcrAddress(actual: string, expected: string): boolean {
@@ -175,6 +238,7 @@ function matchesOcrAddress(actual: string, expected: string): boolean {
 /** Returns a bounded QR-guided repair for OCR text that is otherwise recoverable. */
 export function correctOcrAddress(text: string, expected: string, network: Network): string | undefined {
   if (!validateAddress(expected, network)) return undefined;
+  if (hasMatchingOcrAddress(text, expected, network)) return expected;
   const candidates = ocrAddressCandidates(text);
   for (const candidate of candidates) {
     const prefix = candidate.slice(0, 2);
@@ -183,13 +247,6 @@ export function correctOcrAddress(text: string, expected: string, network: Netwo
     if (body.length < expected.length - maxOcrAddressEdits
       || body.length > expected.length + maxOcrAddressEdits) continue;
     if (matchesOcrAddress(body, expected.slice(2))) return expected;
-  }
-  for (const candidate of abbreviatedOcrAddressCandidates(text)) {
-    const prefix = candidate.prefix.slice(2).toLowerCase();
-    const suffix = candidate.suffix.toLowerCase();
-    const expectedBody = expected.slice(2).toLowerCase();
-    if (prefix.length < 4 || suffix.length < 4 || prefix.length + suffix.length >= expectedBody.length) continue;
-    if (expectedBody.startsWith(prefix) && expectedBody.endsWith(suffix)) return expected;
   }
   return undefined;
 }

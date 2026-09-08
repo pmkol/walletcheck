@@ -285,6 +285,28 @@ describe('OCR address correction', () => {
       .toMatchObject({ status: 'matched', addressStatus: 'matched', payload: { address } });
   });
 
+  it('prefers a QR-aligned symbol-noisy OCR pass over a valid-looking alternate pass', () => {
+    const address = '0x06b5d5f6d085b7bce5691ae5999cd7697d706a86';
+    const text = [
+      'Deposit USDC into Bybit', 'Network: ARBI', 'Wallet Address',
+      'Ox06b5d5f6d085b7bce5691ae5999cd7697d', '706286',
+      'Wallet Address', 'Ox06b5d5f6d085b7bce5691ae5999cd7697d', '/06a86',
+    ].join('\n');
+    expect(evaluateRecognition({ qrPayloads: [address], text }, { coin: 'USDC', network: 'arbitrum' }))
+      .toMatchObject({ status: 'matched', addressStatus: 'matched', payload: { address } });
+  });
+
+  it('does not discard a valid conflict when the noisy pass also has an alphanumeric mismatch', () => {
+    const address = '0x06b5d5f6d085b7bce5691ae5999cd7697d706a86';
+    const text = [
+      'Deposit USDC into Bybit', 'Network: ARBI', 'Wallet Address',
+      'Ox06b5d5f6d085b7bce5691ae5999cd7697d', '706286',
+      'Wallet Address', 'Ox06b5d5f6d085b7bce5691ae5999cd7697d', '/06b86',
+    ].join('\n');
+    expect(evaluateRecognition({ qrPayloads: [address], text }, { coin: 'USDC', network: 'arbitrum' }))
+      .toMatchObject({ status: 'rejected', reason: 'address-conflict', addressStatus: 'mismatched' });
+  });
+
   it('repairs punctuation inserted inside a one-line address when QR agrees', () => {
     const address = '0x06b5d5f6d085b7bce5691ae5999cd7697d706a86';
     const text = `USDC\nArbitrum\n${address.slice(0, 22)}©${address.slice(22)}`;

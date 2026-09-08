@@ -34,7 +34,6 @@ describe('cross-check rules', () => {
     [{ qrPayloads: [], text: address }, 'missing-qr'],
     [{ qrPayloads: [address], text: otherAddress }, 'address-conflict'],
     [{ qrPayloads: [address, otherAddress], text: address }, 'multiple-addresses'],
-    [{ qrPayloads: [address], text: `${address}\n${otherAddress}` }, 'multiple-addresses'],
     [{ qrPayloads: ['https://example.org/' + address], text: address }, 'unsupported-qr'],
     [{ qrPayloads: [address], text: `0x${'a'.repeat(39)}O` }, 'invalid-address'],
     [{ qrPayloads: [address], text: '0xaaaa...aaab' }, 'invalid-address'],
@@ -49,6 +48,17 @@ describe('cross-check rules', () => {
 
   it('deduplicates repeated valid addresses', () => {
     expect(evaluateRecognition({ qrPayloads: [address, address], text: `${address}\n${address}${metadata}` }, options).status).toBe('matched');
+  });
+
+  it('keeps the unique QR-matching text address and ignores other OCR candidates', () => {
+    expect(evaluateRecognition({ qrPayloads: [address], text: `${otherAddress}\n${address}${metadata}` }, options))
+      .toMatchObject({ status: 'matched', payload: { address } });
+  });
+
+  it('does not replace a lone valid conflicting text address through fuzzy correction', () => {
+    const closeAddress = `0x${'a'.repeat(39)}b`;
+    expect(evaluateRecognition({ qrPayloads: [address], text: `${closeAddress}${metadata}` }, options))
+      .toMatchObject({ status: 'rejected', reason: 'address-conflict', addressStatus: 'mismatched' });
   });
 
   it.each([
