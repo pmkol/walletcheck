@@ -3,16 +3,24 @@ export interface AddressLine {
   bbox: { x0: number; y0: number; x1: number; y1: number };
 }
 
+const ignorableAddressCharacter = /[\p{P}\p{S}]/u;
+
+function cleanAddressPart(value: string): string {
+  return [...value]
+    .filter((character) => !ignorableAddressCharacter.test(character))
+    .join('').trim();
+}
+
 export function findWrappedAddresses(lines: AddressLine[]): AddressLine[][] {
   const groups: AddressLine[][] = [];
   for (let index = 0; index < lines.length - 1; index += 1) {
     const first = lines[index];
-    const prefix = first.text.trim();
+    const prefix = cleanAddressPart(first.text);
     if (!/^[0O]x[0-9a-fA-F]{8,38}$/.test(prefix)) continue;
     const candidates: AddressLine[] = [];
     for (let next = index + 1; next < Math.min(lines.length, index + 5); next += 1) {
       const second = lines[next];
-      const suffix = second.text.trim();
+      const suffix = cleanAddressPart(second.text);
       if (!/^[0-9a-fA-F]{2,32}$/.test(suffix) || prefix.length + suffix.length !== 42) continue;
       const height = Math.max(first.bbox.y1 - first.bbox.y0, second.bbox.y1 - second.bbox.y0);
       const gap = second.bbox.y0 - first.bbox.y1;
@@ -48,8 +56,8 @@ export function readReflowedAddress(text: string, lines: AddressLine[]): string 
   // A re-read may legitimately preserve the two source lines. Whitespace is
   // layout, not address content, so normalize it before comparing both OCR
   // readings character-for-character.
-  const address = text.replace(/\s+/g, '').trim();
-  const original = lines.map((line) => line.text.trim()).join('');
+  const address = cleanAddressPart(text).replace(/\s+/g, '').trim();
+  const original = lines.map((line) => cleanAddressPart(line.text)).join('');
   return /^0x[0-9a-fA-F]{40}$/.test(address) && address.slice(2) === original.slice(2) ? address : undefined;
 }
 

@@ -274,6 +274,38 @@ describe('OCR address correction', () => {
       .toMatchObject({ status: 'matched', addressStatus: 'matched', payload: { address } });
   });
 
+  it('accepts a wrapped address when OCR appends a copied-address icon', () => {
+    const address = '0x06b5d5f6d085b7bce5691ae5999cd7697d706a86';
+    const text = [
+      'USDC-Deposit', 'ARBI',
+      '0x06b5d5f6d085b7bce5691ae5999cd7697d7', '06a86 ©',
+      '0.005 USDC',
+    ].join('\n');
+    expect(evaluateRecognition({ qrPayloads: [address], text }, { coin: 'USDC', network: 'arbitrum' }))
+      .toMatchObject({ status: 'matched', addressStatus: 'matched', payload: { address } });
+  });
+
+  it('repairs punctuation inserted inside a one-line address when QR agrees', () => {
+    const address = '0x06b5d5f6d085b7bce5691ae5999cd7697d706a86';
+    const text = `USDC\nArbitrum\n${address.slice(0, 22)}©${address.slice(22)}`;
+    expect(evaluateRecognition({ qrPayloads: [address], text }, { coin: 'USDC', network: 'arbitrum' }))
+      .toMatchObject({ status: 'matched', addressStatus: 'matched', payload: { address } });
+  });
+
+  it('accepts a QR-matching abbreviated address with an ellipsis', () => {
+    const address = '0x30e4d1c2312aaf0bef4d5372fb011ee74c8d827f';
+    const text = 'Deposit USDT\nArbitrum\nOx30E4D1...C8d827F';
+    expect(evaluateRecognition({ qrPayloads: [address, ''], text }, { coin: 'USDT', network: 'arbitrum' }))
+      .toMatchObject({ status: 'matched', addressStatus: 'matched', payload: { address } });
+  });
+
+  it('does not accept an abbreviated address with a mismatched visible part', () => {
+    const address = '0x30e4d1c2312aaf0bef4d5372fb011ee74c8d827f';
+    const text = 'Deposit USDT\nArbitrum\n0x30E4D2...C8d827F';
+    expect(evaluateRecognition({ qrPayloads: [address], text }, { coin: 'USDT', network: 'arbitrum' }))
+      .toMatchObject({ status: 'rejected', reason: 'invalid-address' });
+  });
+
   it('corrects a unique C-like OCR symbol using the QR address', () => {
     const result = evaluateRecognition({
       qrPayloads: ['0x1234567890123456789012345678901234567890'],

@@ -36,6 +36,11 @@ describe('wrapped EVM address OCR regions', () => {
     expect(findWrappedAddresses([first, second])).toEqual([[first, second]]);
   });
 
+  it('finds a wrapped address when OCR appends a copied-address icon', () => {
+    const withIcon = { ...second, text: `${second.text.trim()} ©` };
+    expect(findWrappedAddresses([first, withIcon])).toEqual([[first, withIcon]]);
+  });
+
   it('allows an OCR-confused prefix only to locate pixels for re-recognition', () => {
     const confused = { ...first, text: first.text.replace('0x', 'Ox') };
     expect(findWrappedAddresses([confused, second])).toEqual([[confused, second]]);
@@ -66,5 +71,11 @@ describe('wrapped EVM address OCR regions', () => {
     expect(readReflowedAddress(address.replace('a', 'c'), [confused, second])).toBeUndefined();
     expect(readReflowedAddress(`${address}0`, [confused, second])).toBeUndefined();
     expect(readReflowedAddress('0x123456', [confused, second])).toBeUndefined();
+  });
+
+  it('ignores a copied-address icon when comparing the source lines', () => {
+    const address = first.text.trim() + second.text.trim();
+    expect(readReflowedAddress(address, [first, { ...second, text: `${second.text.trim()} ©` }])).toBe(address);
+    expect(readReflowedAddress(`${address} ®`, [first, second])).toBe(address);
   });
 });

@@ -77,11 +77,11 @@ export function extractTextCandidates(text: string, network: Network): string[] 
     const candidates: string[] = text.match(pattern) ?? [];
     const lines = text.split(/\r?\n/).map((line) => line.trim());
     for (let index = 0; index < lines.length - 1; index += 1) {
-      const prefix = lines[index].replace(/\s+/g, '');
+      const prefix = cleanOcrAddressPart(lines[index]);
       let next = index + 1;
       while (next < lines.length && !lines[next]) next += 1;
       if (next >= lines.length) continue;
-      const suffix = lines[next].replace(/\s+/g, '');
+      const suffix = cleanOcrAddressPart(lines[next]);
       if (!/^[0O][xX][0-9a-fA-F]{8,38}$/.test(prefix)
         || !/^[0-9a-fA-F]{2,32}$/.test(suffix)
         || prefix.length + suffix.length !== 42) continue;
@@ -101,25 +101,40 @@ const ocrConfusions: Record<string, string[]> = {
   'C': ['(', '¢', '©'], 'x': ['X', '×', '*'],
 };
 
-const ignorableOcrAddressCharacters = new Set([
-  '|', '·', '•', ',', '，', ';', '；', '_', '¢', '©', '(', ')', '×', '*',
-]);
+const ignorableOcrAddressCharacter = /[\p{P}\p{S}]/u;
+
+function isIgnorableOcrAddressCharacter(value: string): boolean {
+  return ignorableOcrAddressCharacter.test(value);
+}
+
+function cleanOcrAddressPart(value: string): string {
+  return [...value.replace(/\s+/g, '')]
+    .filter((character) => !isIgnorableOcrAddressCharacter(character))
+    .join('');
+}
 
 function ocrAddressCandidates(text: string): string[] {
   const lines = text.split(/\r?\n/).map((line) => line.trim());
   const candidates: string[] = [];
   for (let index = 0; index < lines.length; index += 1) {
-    const prefix = lines[index].replace(/\s+/g, '');
+    const prefix = cleanOcrAddressPart(lines[index]);
     if (!/^[0O][xX]/.test(prefix) || prefix.length < 10) continue;
     candidates.push(prefix);
     let next = index + 1;
     while (next < lines.length && !lines[next]) next += 1;
     if (next < lines.length) {
-      const suffix = lines[next].replace(/\s+/g, '');
+      const suffix = cleanOcrAddressPart(lines[next]);
       if (/^[0-9a-fA-F]{2,32}$/.test(suffix)) candidates.push(prefix + suffix);
     }
   }
   return [...new Set(candidates)];
+}
+
+// Some wallet screens intentionally show only the address prefix and suffix.
+// Keep this QR-guided: hidden characters are never inferred from OCR alone.
+function abbreviatedOcrAddressCandidates(text: string): Array<{ prefix: string; suffix: string }> {
+  const pattern = /(?<![a-zA-Z0-9])([0O][xX][0-9a-fA-F]{4,38})\s*(?:\.{2,}|…|⋯)\s*([0-9a-fA-F]{4,40})(?![a-zA-Z0-9])/g;
+  return [...text.matchAll(pattern)].map((match) => ({ prefix: match[1], suffix: match[2] }));
 }
 
 function matchesOcrAddress(actual: string, expected: string): boolean {
@@ -143,7 +158,7 @@ function matchesOcrAddress(actual: string, expected: string): boolean {
       const genericSubstitution = /[0-9a-z]/i.test(actualCharacter)
         && actualCharacter.toLowerCase() !== 'o' && /[0-9a-f]/i.test(expectedCharacter);
       const substitution = same ? 0 : confused || genericSubstitution ? 1 : maxEdits + 1;
-      const deletion = differentLength || ignorableOcrAddressCharacters.has(actualCharacter)
+      const deletion = differentLength || isIgnorableOcrAddressCharacter(actualCharacter)
         ? previous[expectedIndex] + 1 : maxEdits + 1;
       const insertion = differentLength ? current[expectedIndex - 1] + 1 : maxEdits + 1;
       current[expectedIndex] = Math.min(
@@ -168,6 +183,13 @@ export function correctOcrAddress(text: string, expected: string, network: Netwo
     if (body.length < expected.length - maxOcrAddressEdits
       || body.length > expected.length + maxOcrAddressEdits) continue;
     if (matchesOcrAddress(body, expected.slice(2))) return expected;
+  }
+  for (const candidate of abbreviatedOcrAddressCandidates(text)) {
+    const prefix = candidate.prefix.slice(2).toLowerCase();
+    const suffix = candidate.suffix.toLowerCase();
+    const expectedBody = expected.slice(2).toLowerCase();
+    if (prefix.length < 4 || suffix.length < 4 || prefix.length + suffix.length >= expectedBody.length) continue;
+    if (expectedBody.startsWith(prefix) && expectedBody.endsWith(suffix)) return expected;
   }
   return undefined;
 }

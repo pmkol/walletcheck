@@ -6,6 +6,7 @@ type ParsedQr = { address: string } | { error: FailureReason } | { ignored: true
 
 function parseQr(raw: string, options: CheckerOptions): ParsedQr {
   const value = raw.trim();
+  if (!value) return { ignored: true };
   if (/^https?:\/\//i.test(value)) {
     try {
       new URL(value);
@@ -50,7 +51,7 @@ export function evaluateRecognition(
   options: CheckerOptions,
 ): VerificationResult {
   const metadata = verifyMetadata(recognition.text, options);
-  const parsed = recognition.qrPayloads.map((payload) => parseQr(payload, options));
+  const parsed = recognition.qrPayloads.filter((payload) => payload.trim()).map((payload) => parseQr(payload, options));
   const textCandidates = extractTextCandidates(recognition.text, options.network);
   const distinct = (addresses: string[]) => [...new Set(addresses.map(
     (address) => normalizeAddress(address, options.network),

@@ -66,4 +66,16 @@ describe('network address formats', () => {
     expect(extractTextCandidates('Oxa359b7e6b5b23dd23cb11f644d2367\n\n6de02987ff', 'arbitrum'))
       .toContain('0xa359b7e6b5b23dd23cb11f644d23676de02987ff');
   });
+
+  it('ignores a copied-address icon attached to a wrapped continuation', () => {
+    expect(extractTextCandidates('0x06b5d5f6d085b7bce5691ae5999cd7697d7\n06a86 ©', 'arbitrum'))
+      .toContain('0x06b5d5f6d085b7bce5691ae5999cd7697d706a86');
+  });
+
+  it('ignores arbitrary punctuation and symbols but keeps address letters', () => {
+    expect(extractTextCandidates('0x06b5d5f6d085b7bce5691ae5999cd7697d7\n06a86 ®', 'arbitrum'))
+      .toContain('0x06b5d5f6d085b7bce5691ae5999cd7697d706a86');
+    expect(extractTextCandidates('0x06b5d5f6d085b7bce5691ae5999cd7697d7\n06a8G ®', 'arbitrum'))
+      .not.toContain('0x06b5d5f6d085b7bce5691ae5999cd7697d706a86');
+  });
 });

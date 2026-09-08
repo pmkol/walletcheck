@@ -37,7 +37,7 @@ describe('cross-check rules', () => {
     [{ qrPayloads: [address], text: `${address}\n${otherAddress}` }, 'multiple-addresses'],
     [{ qrPayloads: ['https://example.org/' + address], text: address }, 'unsupported-qr'],
     [{ qrPayloads: [address], text: `0x${'a'.repeat(39)}O` }, 'invalid-address'],
-    [{ qrPayloads: [address], text: '0xaaaa...aaaa' }, 'invalid-address'],
+    [{ qrPayloads: [address], text: '0xaaaa...aaab' }, 'invalid-address'],
   ])('rejects unsafe or incomplete recognition %#', (recognition, reason) => {
     expect(evaluateRecognition(recognition, options)).toMatchObject({
       status: 'rejected', reason, addressVerified: false, ocrText: recognition.text,
@@ -59,6 +59,16 @@ describe('cross-check rules', () => {
     expect(evaluateRecognition({ qrPayloads, text: `${address}${metadata}` }, options)).toMatchObject({
       status: 'matched', payload: { address },
     });
+  });
+
+  it('ignores an empty QR payload returned alongside a valid wallet QR', () => {
+    expect(evaluateRecognition({ qrPayloads: [address, ''], text: `${address}${metadata}` }, options))
+      .toMatchObject({ status: 'matched', payload: { address } });
+  });
+
+  it('treats an empty-only QR result as no address', () => {
+    expect(evaluateRecognition({ qrPayloads: ['', '  '], text: `${address}${metadata}` }, options))
+      .toMatchObject({ status: 'rejected', reason: 'missing-qr' });
   });
 
   it.each<[string[], string, FailureReason]>([
