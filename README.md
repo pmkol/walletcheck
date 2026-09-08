@@ -88,6 +88,10 @@ The SDK does not make business API requests. Your application decides whether an
 | `bitcoin` | Bitcoin |
 | `solana` | Solana |
 
+### Coin options
+
+`projectCoins` in `src/coins.ts` is bundled into `walletcheck-js/modal` and `walletcheck-js/element`. It defines the demo selector and controls the coin alternatives displayed by the modal and Web Component after a mismatch: only detected values in `projectCoins` are shown, otherwise the value stays empty. Each check still has one target `coin`; headless `metadata.coin.detected` remains unfiltered. Rebuild after changing the list.
+
 ## Headless SDK
 
 Use this when you provide your own upload and confirmation UI:

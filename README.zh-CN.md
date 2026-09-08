@@ -88,6 +88,10 @@ SDK 不提交业务请求，由接入程序收到确认结果后自行发送后�
 | `bitcoin` | Bitcoin |
 | `solana` | Solana |
 
+### 币种选项
+
+`src/coins.ts` 中的 `projectCoins` 会打包进 `walletcheck-js/modal` 和 `walletcheck-js/element`。它同时定义演示页下拉选项，并控制弹窗和 Web Component 在币种不匹配时显示的候选币种：只显示 OCR 结果中存在于 `projectCoins` 的币种，没有交集则留空。每次核对仍只有一个目标 `coin`；无界面 SDK 的 `metadata.coin.detected` 保留完整 OCR 结果。修改列表后需重新执行 `npm run build`。
+
 ## 无界面 SDK
 
 适用于自行实现上传及确认界面的项目：
